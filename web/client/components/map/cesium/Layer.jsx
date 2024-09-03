@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 /*
  * Copyright 2017, GeoSolutions Sas.
  * All rights reserved.
@@ -12,6 +13,33 @@ import assign from 'object-assign';
 import PropTypes from 'prop-types';
 import { round, isNil } from 'lodash';
 import { getResolutions } from '../../../utils/MapUtils';
+import { testCors } from '../../../api/CORS';
+
+
+// let proxyChecked = false;
+// const testCors = (url) => {
+//     return fetch(url, {
+//         method: 'GET',
+//         mode: 'cors'
+//     })
+//         .then(response => {
+//             // console.log(response, 'response');
+//             // if (!response.ok && response.type === 'opaque') {
+//             //     return true;
+//             // }
+
+//             // proxyChecked = true;
+//             return false;
+
+//         })
+//         .catch(error => {
+
+//             return true; // Assume CORS error or other issue
+
+
+//         });
+// };
+
 
 class CesiumLayer extends React.Component {
     static propTypes = {
@@ -66,6 +94,8 @@ class CesiumLayer extends React.Component {
 
             }
         }
+        this.corschecked = false;
+
         this.updateLayer(newProps, this.props);
     }
 
@@ -89,6 +119,7 @@ class CesiumLayer extends React.Component {
     }
 
     render() {
+        // console.log('render', this.props.options);
         if (this.props.children) {
             const layer = this.layer;
             const children = layer ? React.Children.map(this.props.children, child => {
@@ -236,22 +267,81 @@ class CesiumLayer extends React.Component {
         newProps.map.scene.requestRender();
     };
 
+    // checkCors= (layer, options, callback) => {
+
+    //     layer.requestImage(0, 0, 0).then((data) => {
+    //         console.log(data, 'dataa', layer);
+    //         callback();
+    //     }).catch((e) => {
+    //         console.log(e);
+    //         this.updateLayer({...this.props, options: {...options, forceProxy: true}}, this.props);
+    //         console.log(options.title, layer);
+    //         this.corschecked = true;
+    //     });
+
+
+    //     // if (layer._tileProvider && layer._resource && layer._resource._queryParameters) {
+    //     //     let url = layer._tileProvider._subdomains[0] + '?' + Object.keys(layer._resource._queryParameters).filter(k=>k !== 'bbox').map(key => key + '=' + layer._resource._queryParameters[key]).join('&');
+    //     //     url = url + '&bbox=-90%2C0%2C-67.5%2C22.5';
+    //     //     console.log(url);
+
+
+    //     //     fetch(url, {
+    //     //         method: 'GET'
+    //     //     })
+    //     //     .then(data => {
+    //     //         console.log(data, 'data');
+    //     //         callback();
+    //     //     })
+    //     //     .catch(e => {
+    //     //         console.log(e, 'error');
+    //     //         // Handle the error here
+    //     //         this.updateLayer({...this.props, options: {...options, forceProxy: true}}, this.props);
+    //     //         this.corschecked = true;
+    //     //     });
+    //     // }
+
+    //     // {
+    //     //     "tilematrix": "EPSG:4326:1",
+    //     //     "layer": "ne:populated_places",
+    //     //     "style": "ne:populated_places",
+    //     //     "tilerow": "1",
+    //     //     "tilecol": "2",
+    //     //     "tilematrixset": "EPSG:4326",
+    //     //     "format": "image/png",
+    //     //     "service": "WMTS",
+    //     //     "version": "1.0.0",
+    //     //     "request": "GetTile"
+    //     //   }
+
+
+    // }
+
+
     addLayerInternal = (newProps) => {
         if (newProps.options.useForElevation) {
             this.props.map.terrainProvider = this.layer;
         } else {
-            this.provider = this.props.map.imageryLayers.addImageryProvider(this.layer);
-            this.provider._position = this.props.position;
-            if (newProps.options.opacity !== undefined) {
-                this.provider.alpha = newProps.options.opacity;
-            }
+            const callback = () => {
+                this.provider = this.props.map.imageryLayers.addImageryProvider(this.layer); // look for a better way to handle this
+                this.provider._position = this.props.position;
+                if (newProps.options.opacity !== undefined) {
+                    this.provider.alpha = newProps.options.opacity;
+                }
+                newProps.map.scene.requestRender();
+            };
+            callback();
+
+            // if (!this.corschecked) {
+            //     this.checkCors(this.layer, newProps.options, callback);
+            // } else {
+            //     callback();
+            // }
         }
-        newProps.map.scene.requestRender();
+        // newProps.map.scene.requestRender();
     };
 
-    addLayer = (newProps) => {
-        // detached layers are layers that do not work through a provider
-        // for this reason they cannot be added or removed from the map imageryProviders
+    addLayerAfterCheck = (newProps) => {
         if (this.layer && !this.layer.detached) {
             this.addLayerInternal(newProps);
             if (this.props.options.refresh && this.layer.updateParams) {
@@ -265,6 +355,41 @@ class CesiumLayer extends React.Component {
                 }, this.props.options.refresh);
             }
         }
+    };
+
+    addLayer = (newProps) => {
+        console.log('addLayer', this.proxyChecked, this.props.options.visibility);
+        if (!this.proxyChecked && this.props.options.url) {
+            testCors( this.props.options.url)
+                .then((corsError) => {
+                    this.proxyChecked = true;
+                    if (corsError) {
+                        this.updateLayer({...this.props, options: {...this.props.options, forceProxy: true}}, this.props);
+                    } else {
+                        this.addLayerAfterCheck(newProps);
+                    }
+                }
+                );
+        } else {
+            this.addLayerAfterCheck(newProps);
+        }
+
+        // detached layers are layers that do not work through a provider
+        // for this reason they cannot be added or removed from the map imageryProviders
+
+        // if (this.layer && !this.layer.detached) {
+        //     this.addLayerInternal(newProps);
+        //     if (this.props.options.refresh && this.layer.updateParams) {
+        //         let counter = 0;
+        //         this.refreshTimer = setInterval(() => {
+        //             const newLayer = this.layer.updateParams(assign({}, this.props.options.params, {_refreshCounter: counter++}));
+        //             this.removeLayer();
+        //             this.layer = newLayer;
+        //             this.addLayerInternal(newProps);
+        //             this.props.map.scene.requestRender();
+        //         }, this.props.options.refresh);
+        //     }
+        // }
     };
 
     removeLayer = (provider) => {
