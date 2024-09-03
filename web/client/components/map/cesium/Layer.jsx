@@ -359,7 +359,7 @@ class CesiumLayer extends React.Component {
 
     addLayer = (newProps) => {
         console.log('addLayer', this.proxyChecked, this.props.options.visibility);
-        if (!this.proxyChecked && this.props.options.url) {
+        if (!this.proxyChecked && this.props.options.url && isString(this.props.options.url)) {
             testCors( this.props.options.url)
                 .then((corsError) => {
                     this.proxyChecked = true;
