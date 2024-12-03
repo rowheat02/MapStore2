@@ -9,11 +9,12 @@ import Proj4js from 'proj4';
 import PropTypes from 'prop-types';
 import url from 'url';
 import axios from 'axios';
-import { castArray, isArray, isObject, endsWith, isNil, get } from 'lodash';
+import { castArray, isArray, isObject, endsWith, isNil, get, merge, mergeWith, uniqBy } from 'lodash';
 import assign from 'object-assign';
 import { Promise } from 'es6-promise';
 import isMobile from 'ismobilejs';
 import {mergeConfigsPatch} from "@mapstore/patcher";
+import { getRegisterHandlers } from '../selectors/mapsave';
 
 const epsg4326 = Proj4js ? new Proj4js.Proj('EPSG:4326') : null;
 const centerPropType = PropTypes.shape({
@@ -487,6 +488,182 @@ export const getMiscSetting = (name, defaultVal) => {
     return get(getConfigProp('miscSettings') ?? {}, name, defaultVal);
 };
 
+// IDs for userSession
+export const SESSION_IDS = {
+    EVERYTHING: "everything",
+    MAP: "map",
+    MAP_POS: "map_pos",
+    VISUALIZATION_MODE: "visualization_mode",
+    LAYERS: "layers",
+    ANNOTATIONS_LAYER: "annotations_layer",
+    MEASUREMENTS_LAYER: "measurements_layer",
+    BACKGROUND_LAYERS: "background_layers",
+    OTHER_LAYERS: "other_layers",
+    CATALOG_SERVICES: "catalog_services",
+    WIDGETS: "widgets",
+    SEARCH: "search",
+    TEXT_SEARCH_SERVICES: "text_search_services",
+    BOOKMARKS: "bookmarks",
+    FEATURE_GRID: "feature_grid",
+    OTHER: "other",
+    USER_PLUGINS: "userPlugins"
+};
+export const updateOverrideConfigToClean = (override, thingsToClear = [], originalConfig = {}) => {
+    let overrideConfig = override;
+
+    if (thingsToClear?.includes(SESSION_IDS.EVERYTHING)) {
+        overrideConfig = {};
+        return overrideConfig;
+    }
+
+    // zoom and center
+    if (thingsToClear.includes(SESSION_IDS.MAP_POS)) {
+        delete overrideConfig.map.zoom;
+        delete overrideConfig.map.center;
+    }
+    // visualization mode
+    if (thingsToClear.includes(SESSION_IDS.VISUALIZATION_MODE)) {
+        delete overrideConfig.map.visualizationMode;
+    }
+    // annotation layers
+    if (thingsToClear?.includes(SESSION_IDS.ANNOTATIONS_LAYER)) {
+        // merge(loadash) on array has problem with arrays with different object in same index
+        // so putting default layers here
+        overrideConfig.map.layers = overrideConfig.map.layers.filter((l)=>!l.id.includes('annotations'));
+    }
+    // measurements layers
+    if (thingsToClear?.includes(SESSION_IDS.MEASUREMENTS_LAYER)) {
+        // merge(loadash) on array has problem with arrays with different object in same index
+        // so putting default layers here
+
+        overrideConfig.map.layers = overrideConfig.map.layers.filter((l)=>originalConfig?.map?.layers.some(layer=>layer.id === l.id) || !l?.name?.includes('measurements'));
+    }
+    // background layers
+    if (thingsToClear?.includes(SESSION_IDS.BACKGROUND_LAYERS)) {
+        overrideConfig.map.layers = overrideConfig.map.layers.filter((l)=>originalConfig?.map?.layers.some(layer=>layer.id === l.id) || !l?.group?.includes('background'));
+    }
+    // other layers
+    if (thingsToClear?.includes(SESSION_IDS.OTHER_LAYERS)) {
+        // merge(loadash) on array has problem with arrays with different object in same index
+        // so putting default layers here
+        overrideConfig.map.layers = overrideConfig.map.layers.filter((l)=>{
+            return  originalConfig?.map?.layers.some(layer=>layer.id === l.id) || l.group?.includes("background") || l?.name?.includes('measurements') || l?.id?.includes('annotations');
+        });
+    }
+    // catalog services
+    if (thingsToClear?.includes(SESSION_IDS.CATALOG_SERVICES)) {
+        delete overrideConfig.catalogServices;
+    }
+    // widgets
+    if (thingsToClear?.includes(SESSION_IDS.WIDGETS)) {
+        delete overrideConfig.widgetsConfig;
+    }
+
+    // search services
+    if (thingsToClear?.includes(SESSION_IDS.TEXT_SEARCH_SERVICES)) {
+        delete overrideConfig.map.text_search_config;
+    }
+
+    // bookmarks
+    if (thingsToClear?.includes(SESSION_IDS.BOOKMARKS)) {
+        delete overrideConfig.map.bookmark_search_config;
+    }
+
+    // feature grid
+    if (thingsToClear?.includes(SESSION_IDS.FEATURE_GRID)) {
+        delete overrideConfig.featureGrid;
+    }
+
+    if (thingsToClear?.includes(SESSION_IDS.USER_PLUGINS)) {
+        delete overrideConfig.context.userPlugins;
+    }
+
+    // handle config from registerCustomSaveConfig
+    const customHandlers = thingsToClear?.filter(v => getRegisterHandlers().includes(v));
+    customHandlers?.forEach((k) => {
+        delete overrideConfig[k]; // Assuming overrideConfig is an object and k is the key
+    });
+
+    return overrideConfig;
+
+};
+/**
+ * TODO: move me in utils
+ * Applies the override to the configuration.
+ * The override is applied to the configuration using a deep merge.
+ * Like for browser cache removal, this functionality allows to override the configuration with a partial configuration.
+ * The original configuration shape has this form:
+ * ```
+ * {
+ *    map: {
+ *       projection: "EPSG:3857",
+ *      center: {
+ *         x: 0,
+ *        y: 0
+ *   },
+ *   zoom: 5
+ * }
+ *
+ * @param {object} config the configuration to override
+ * @param {object} override the data to use for override
+ * @returns {object}
+ */
+export const applyOverrides = (config, override) => {
+    // console.log(config, override, 'overridess', checks);
+    // // console.log(merge({},{a:"c"},{a:"b"}), merge({}, config, override), 'overridess1');
+    // function customizer(objValue, srcValue) {
+    //     // If both values are arrays, merge them by `id`
+    //     if (Array.isArray(objValue) && Array.isArray(srcValue)) {
+    //         // Reverse the arrays so we keep the last occurrence when using `uniqBy`
+    //         return uniqBy(
+    //             [...srcValue, ...objValue].reverse(),  // Reverse to ensure last occurrence comes first
+    //             'id'
+    //         ).reverse();  // Reverse back to restore the original order
+    //     }
+    //     return undefined; // Let Lodash handle other cases (non-array or non-object)
+    // }
+    // if (override?.mode === 'partials') {
+    //     // TODO: implement partials override
+    //     const updatedConfig = updateOverrideConfigToClean(override, checks);
+
+    //     const merged = merge({}, config, updatedConfig );
+    //     merged.map.layers = updatedConfig.map.layers;
+    //     // let merged = mergeWith({}, config, updatedConfig, customizer);
+    //     // merged = merged.filter((value, index, self) =>
+    //     //     // Use a Set to track seen ids
+    //     //     self.findIndex(item => item.id === value.id) === index
+    //     // );
+    //     // console.log(updatedConfig, 'updatedConfig', config, merged);
+    //     // console.log(merged, 'overridessmerge');
+    //     // return merged;
+    //     return merged;
+
+    //     //     {
+    //     //     map: {
+    //     //         center: {
+    //     //             ...override.map.center,
+    //     //             y: 0,
+    //     //             x: 0
+    //     //         },
+    //     //         zoom: 1
+    //     //     },
+    //     //     // toc: {
+    //     //     //     ...override.toc
+    //     //     // },
+    //     //     catalogServices:{
+    //     //         ...override.catalogServices
+    //     //     }
+    //     // }
+    // // );
+    // }
+    //  merged = merged.filter((value, index, self) =>
+    //     // Use a Set to track seen ids
+    //     self.findIndex(item => item.id === value.id) === index
+    // );
+    // const merged = mergeWith({}, config, override, customizer);
+    const merged = merge({}, config, override);
+    return merged;
+};
 const ConfigUtils = {
     PropTypes: {
         center: centerPropType,
@@ -525,6 +702,7 @@ const ConfigUtils = {
     setConfigProp,
     removeConfigProp,
     getMiscSetting
+
 };
 
 export default ConfigUtils;

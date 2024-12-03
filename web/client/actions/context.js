@@ -73,3 +73,13 @@ export const UPDATE_USER_PLUGIN = "CONTEXT:UPDATE_USER_PLUGIN";
  * updateUserPlugin("Annotations", {active: true})
  */
 export const updateUserPlugin = (name, values) => ({ type: UPDATE_USER_PLUGIN, name, values});
+
+
+export const SET_USER_PLUGINS = "CONTEXT:SET_USER_PLUGINS";
+
+
+/**
+ * Sets the user plugins in the context state.
+ * @param {Array} userPlugins the array of user plugins
+ */
+export const setUserPlugins = userPlugins => ({ type: SET_USER_PLUGINS, userPlugins });

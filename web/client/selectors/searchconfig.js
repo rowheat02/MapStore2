@@ -6,6 +6,9 @@
  * LICENSE file in the root directory of this source tree.
  */
 
+// import { registerCustomSaveHandler } from "./mapsave";
+
 export const textSearchConfigSelector = state => state.searchconfig && state.searchconfig.textSearchConfig;
 
 export const bookmarkSearchConfigSelector = state => state.searchbookmarkconfig && state.searchbookmarkconfig.bookmarkSearchConfig;
+

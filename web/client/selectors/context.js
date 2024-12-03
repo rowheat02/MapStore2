@@ -57,6 +57,7 @@ export const templatesSelector = createSelector(
     (context = {}) => context.templates
 );
 
+
 /**
  * Selects the plugins configuration depending on the current state.
  * It loads the defaultPlugins, the loadingPlugins, the errorPlugins or the contextPlugins.

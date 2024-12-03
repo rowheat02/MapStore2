@@ -373,6 +373,7 @@
             { "name": "WidgetsTray" }
         ],
         "desktop": ["Details",
+        "UserSession",
           {
             "name": "Map",
             "cfg": {

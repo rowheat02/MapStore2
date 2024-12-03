@@ -5,9 +5,10 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import { SET_CURRENT_CONTEXT, LOADING, SET_RESOURCE, CLEAR_CONTEXT, UPDATE_USER_PLUGIN } from "../actions/context";
+import { SET_CURRENT_CONTEXT, LOADING, SET_RESOURCE, CLEAR_CONTEXT, UPDATE_USER_PLUGIN, SET_USER_PLUGINS } from "../actions/context";
 import { find, get } from 'lodash';
 import {set, arrayUpdate} from '../utils/ImmutableUtils';
+import { MAP_CONFIG_LOADED } from "../actions/config";
 
 /**
  * Reducers for context page and configs.
@@ -31,12 +32,23 @@ import {set, arrayUpdate} from '../utils/ImmutableUtils';
  */
 export default (state = {}, action) => {
     switch (action.type) {
+    case MAP_CONFIG_LOADED: {
+        // console.log(action);
+        return set('currentContext.userPlugins',
+            action.config?.context?.userPlugins ?? state.resource?.data?.userPlugins
+            , state);
+    }
     case SET_CURRENT_CONTEXT: {
+        console.log(action.context, action.session, 'action.context');
+        // const currentContext = action.context;
         return set('currentContext', action.context, state);
     }
     case SET_RESOURCE: {
         return set('resource', action.resource, state);
     }
+    // case SET_USER_PLUGINS: {
+    //     return set('currentContext.userPlugins', action.userPlugins, state);
+    // }
     case CLEAR_CONTEXT: {
         return {};
     }
@@ -56,4 +68,8 @@ export default (state = {}, action) => {
     default:
         return state;
     }
+
+    // case MAP_CONFIG_LOADED:{
+
+    // }
 };

@@ -31,7 +31,7 @@ import { getDashboardId } from '../selectors/dashboard';
 import { DASHBOARD_LOADED } from '../actions/dashboard';
 import {loadUserSession, USER_SESSION_LOADED, userSessionStartSaving, saveMapConfig} from '../actions/usersession';
 import { detailsLoaded, openDetailsPanel } from '../actions/details';
-import {userSessionEnabledSelector, buildSessionName} from "../selectors/usersession";
+import {userSessionEnabledSelector, buildSessionName, checkedSessionToClear} from "../selectors/usersession";
 import {getRequestParameterValue} from "../utils/QueryParamsUtils";
 import { EMPTY_RESOURCE_VALUE } from '../utils/MapInfoUtils';
 import { changeLayerProperties } from '../actions/layers';
@@ -48,10 +48,12 @@ import {
 import { getSupportedFormat } from '../api/WMS';
 import { wrapStartStop } from '../observables/epics';
 import { error } from '../actions/notifications';
+import { applyOverrides } from '../utils/ConfigUtils';
 
-const prepareMapConfiguration = (data, override, state) => {
+
+const prepareMapConfiguration = (data, override, state, checks) => {
     const queryParamsMap = getRequestParameterValue('map', state);
-    let mapConfig = merge({}, data, override);
+    let mapConfig = applyOverrides(data, override, checks);
     mapConfig = {
         ...mapConfig,
         ...(queryParamsMap ?? {}),
@@ -93,7 +95,7 @@ export const loadNewMapEpic = (action$) =>
  * @returns {Observable} map configuration flow
  * @ignore
  */
-const mapFlowWithOverride = (configName, mapId, config, mapInfo, state, overrideConfig = {}) => {
+const mapFlowWithOverride = (configName, mapId, config, mapInfo, state, overrideConfig = {}, checks) => {
     // delay here is to postpone map load to ensure that
     // certain epics always function correctly
     // i.e. FeedbackMask disables correctly after load
@@ -102,15 +104,17 @@ const mapFlowWithOverride = (configName, mapId, config, mapInfo, state, override
     // mapstore recognizes alphanumeric map id as static json
     // avoid map info requests if the configuration is static
     const isNumberId = !isNaN(parseFloat(mapId));
+    console.log(applyOverrides(config, overrideConfig, checks ), 'applyOverrides(config, overrideConfig, checks )');
     return (
         config ?
-            Observable.of({data: merge({}, config, overrideConfig), staticConfig: true}).delay(100) :
+            Observable.of({data: applyOverrides(config, overrideConfig, checks ), staticConfig: true}).delay(100) :
             Observable.defer(() => axios.get(configName)))
         .switchMap(response => {
             // added !config in order to avoid showing login modal when a new.json mapConfig is used in a public context
             if (configName === "new.json" && !config && !isLoggedIn(state)) {
                 return Observable.of(configureError({status: 403}));
             }
+            // console.log("response", response);
             if (typeof response.data === 'object') {
                 const projectionDefs = projectionDefsSelector(state);
                 const projection = get(response, "data.map.projection", "EPSG:3857");
@@ -142,7 +146,10 @@ const mapFlowWithOverride = (configName, mapId, config, mapInfo, state, override
                 return Observable.of(configureError('Configuration file broken (' + configName + '): ' + e.message, mapId));
             }
         })
-        .catch((e) => Observable.of(configureError(e, mapId)));
+        .catch((e) => {
+            console.log(e);
+            return Observable.of(configureError(e, mapId))
+        });
 };
 
 /**
@@ -156,17 +163,16 @@ export const loadMapConfigAndConfigureMap = (action$, store) =>
         .switchMap(({configName, mapId, config, mapInfo, overrideConfig}) => {
             const sessionsEnabled = userSessionEnabledSelector(store.getState());
             if (overrideConfig || !sessionsEnabled) {
-                return mapFlowWithOverride(configName, mapId, config, mapInfo, store.getState(), overrideConfig);
+                const checks = checkedSessionToClear(store.getState());
+                return mapFlowWithOverride(configName, mapId, config, mapInfo, store.getState(), overrideConfig, checks);
             }
+            // if(override)
             const userName = userSelector(store.getState())?.name;
             return Observable.of(loadUserSession(buildSessionName(null, mapId, userName))).merge(
                 action$.ofType(USER_SESSION_LOADED).switchMap(({session}) => {
-                    const sessionData = {
-                        ...(session?.map && {map: session.map}),
-                        ...(session?.featureGrid && {featureGrid: session.featureGrid})
-                    };
+
                     return Observable.merge(
-                        mapFlowWithOverride(configName, mapId, config, mapInfo, store.getState(), sessionData),
+                        mapFlowWithOverride(configName, mapId, config, mapInfo, store.getState(), session),
                         Observable.of(userSessionStartSaving())
                     );
                 })

@@ -349,7 +349,15 @@ export const createStore = ({
     const middleware = applyMiddleware.apply(null, getMiddlewares(allMiddlewares, debug));
     const finalCreateStore = (window.__REDUX_DEVTOOLS_EXTENSION__ && debug ? compose(
         middleware,
-        window.__REDUX_DEVTOOLS_EXTENSION__()
+        window.__REDUX_DEVTOOLS_EXTENSION__({
+            actionsBlacklist: [
+                'USER_SESSION:SAVE',
+                'USER_SESSION:LOADING',
+                'USER_SESSION:SAVED',
+                'REFRESH_SUCCESS'
+            ],
+            maxAge: 100
+        })
     ) : middleware)(createReduxStore);
     return setStore(finalCreateStore(reducer, state, enhancer));
 };

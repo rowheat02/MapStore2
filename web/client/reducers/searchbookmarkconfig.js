@@ -13,15 +13,19 @@ import {
 } from '../actions/searchbookmarkconfig';
 import {RESET_CONTROLS} from '../actions/controls';
 import {MAP_CONFIG_LOADED} from '../actions/config';
+import { REDUCERS_LOADED } from '../actions/storemanager';
 
 export default (state = null, action) => {
     switch (action.type) {
     case SET_SEARCH_BOOKMARK_CONFIG:
         return {...state, [action.property]: action.value};
-    case MAP_CONFIG_LOADED: {
+    case REDUCERS_LOADED:
+        console.log("Hello reducers");
+        return {...state };
+    case MAP_CONFIG_LOADED:
+        // console.log(action.config.map.bookmark_search_config, 'action.config.map.bookmark_search_config');
         const bookmarkSearchConfig = action.config.map.bookmark_search_config || {};
         return {...state, bookmarkSearchConfig};
-    }
     case RESET_CONTROLS:
     case RESET_BOOKMARK_CONFIG: {
         return {...state, bookmark: undefined, page: 0, editIdx: undefined};

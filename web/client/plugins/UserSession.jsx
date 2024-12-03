@@ -5,28 +5,135 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {connect} from "react-redux";
 import {createPlugin} from "../utils/PluginsUtils";
 import usersession from "../reducers/usersession";
 import {saveUserSessionEpicCreator, autoSaveSessionEpicCreator, loadUserSessionEpicCreator,
-    removeUserSessionEpicCreator, stopSaveSessionEpic, reloadOriginalConfigEpic} from "../epics/usersession";
+    removeUserSessionEpicCreator, stopSaveSessionEpic, reloadOriginalConfigEpic,
+    setSessionToDynamicReducers} from "../epics/usersession";
 import Message from "../components/I18N/Message";
 import {Glyphicon} from "react-bootstrap";
 import {toggleControl} from "../actions/controls";
-import { removeUserSession, enableAutoSave} from "../actions/usersession";
+import { removeUserSession, enableAutoSave, setCheckedSessionToClear} from "../actions/usersession";
 import ConfirmModal from "../components/resources/modals/ConfirmModal";
+import Tree from './session/Tree';
+import { getRegisterHandlers } from "../selectors/mapsave";
+import { SESSION_IDS as IDS } from "../utils/ConfigUtils";
+
+getRegisterHandlers();
+
+const treeData = [
+    {
+        id: IDS.EVERYTHING,
+        checked: true,
+        disabled: false,
+        children: [
+            {
+                id: IDS.MAP,
+                label: 'Map',
+                checked: true,
+                disabled: false,
+                children: [
+                    {
+                        id: IDS.MAP_POS,
+                        checked: true,
+                        disabled: false
+                    },
+                    {
+                        id: IDS.VISUALIZATION_MODE,
+                        checked: true,
+                        disabled: false
+                    },
+                    {
+                        id: IDS.LAYERS,
+                        checked: true,
+                        disabled: false,
+                        children: [
+                            {
+                                id: IDS.ANNOTATIONS_LAYER,
+                                checked: true,
+                                disabled: false
+                            },
+                            {
+                                id: IDS.MEASUREMENTS_LAYER,
+                                checked: true,
+                                disabled: false
+                            },
+                            {
+                                id: IDS.BACKGROUND_LAYERS,
+                                checked: true,
+                                disabled: false
+                            },
+                            {
+                                id: IDS.OTHER_LAYERS,
+                                checked: true,
+                                disabled: false
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                id: IDS.CATALOG_SERVICES,
+                checked: true,
+                disabled: false
+            },
+            {
+                id: IDS.WIDGETS,
+                checked: true,
+                disabled: false
+            },
+            {
+                id: IDS.SEARCH,
+                checked: true,
+                disabled: false,
+                children: [
+                    {
+                        id: IDS.TEXT_SEARCH_SERVICES,
+                        checked: true,
+                        disabled: false
+                    },
+                    {
+                        id: IDS.BOOKMARKS,
+                        checked: true,
+                        disabled: false
+                    }
+                ]
+            },
+            {
+                id: IDS.FEATURE_GRID,
+                checked: true,
+                disabled: false
+            },
+            {
+                id: IDS.OTHER,
+                checked: true,
+                disabled: false,
+                children: [
+                    // Additional children can be added here
+                    // handled in userEffect below since customSavedConfig are not ready here
+                ]
+            }
+        ]
+    }
+];
+
 
 const ResetUserSession = connect((state) => ({
-    enabled: state?.controls?.resetUserSession?.enabled ?? false
+    enabled: state?.controls?.resetUserSession?.enabled ?? false,
+    checks: state?.usersession.checkedSessionToClear
 }), {
     setAutoSave: enableAutoSave,
     onClose: toggleControl.bind(null, 'resetUserSession', null),
-    onConfirm: removeUserSession
-})(({ enabled = false, onClose, onConfirm, setAutoSave = () => {}}) => {
+    onConfirm: (checks) => removeUserSession(checks),
+    onTreeUpdate: (tree) => setCheckedSessionToClear(tree)
+})(({ enabled = false, onClose, onConfirm, setAutoSave = () => {}, onTreeUpdate, checks}) => {
+    const [trees, setTrees] = useState(treeData);
+
     const confirm = () => {
         onClose();
-        onConfirm();
+        onConfirm(checks);
     };
     useEffect(() => {
         setAutoSave(true);
@@ -35,9 +142,47 @@ const ResetUserSession = connect((state) => ({
             setAutoSave(false);
         };
     }, []);
+
+    useEffect(() =>{
+        if (!enabled) return;
+        // console.log(getRegisterHandlers(), 'Hello getRegisterHandlers');
+        const tree = [...trees];
+        // update the children of first element which is  `everything`
+        tree[0].children.forEach((child) => {
+            if (child.id === IDS.OTHER) {
+                child.children = [
+                    ...getRegisterHandlers().map((key) => {
+                        return {
+                            id: key,
+                            label: key,
+                            checked: true
+                        };
+                    }),
+                    {
+                        id: IDS.USER_PLUGINS,
+                        checked: true,
+                        disabled: false
+                    }
+                ];
+            }
+        });
+        setTrees(tree);
+    // `getRegisterHandlers` may not give all handlers at the load time so updating after dialog open
+    }, [enabled]);
+    // TODO: implement changes management
     return (<ConfirmModal onClose={onClose}
-        onConfirm={confirm} show={enabled} buttonSize="large">
-        <Message msgId="userSession.confirmRemove"/></ConfirmModal>);
+        onConfirm={() => confirm(checks)} show={enabled} buttonSize="large">
+
+        <div style={{maxHeight: 400, overflowY: 'scroll'}}>
+            <Message msgId="userSession.confirmRemove"/>
+            <Message msgId={`userSession.sessionLabels.${IDS.EVERYTHING}`} />
+            {/* Select what you want to reset: */}
+            <Tree data={trees} onTreeUpdate={(updatedTree)=>{
+                // console.log(updatedTree, 'setSelected');
+                onTreeUpdate(updatedTree);
+            }}/>
+        </div>
+    </ConfirmModal>);
 });
 
 const hasSession = (state) => state?.usersession?.session;
@@ -123,6 +268,6 @@ export default createPlugin('UserSession', {
         usersession
     },
     epics: {
-        saveUserSessionEpic, autoSaveSessionEpic, stopSaveSessionEpic, loadUserSessionEpic, removeUserSessionEpic, reloadOriginalConfigEpic
+        saveUserSessionEpic, autoSaveSessionEpic, stopSaveSessionEpic, loadUserSessionEpic, removeUserSessionEpic, reloadOriginalConfigEpic, setSessionToDynamicReducers
     }
 });

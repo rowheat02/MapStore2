@@ -116,11 +116,10 @@ const createSessionFlow = (mapId, contextName, resourceCategory, action$, getSta
         (mapId ? Observable.of(null) : getResourceDataByName(resourceCategory, contextName))
     ).flatMap(([id, data]) => {
         const userName = userSelector(getState())?.name;
-        return Observable.of(loadUserSession(buildSessionName(id, mapId, userName))).merge(
+        return Observable.of(loadUserSession(buildSessionName(id, mapId, userName))).delay(2000).merge(
             action$.ofType(USER_SESSION_LOADED).take(1).switchMap(({session}) => {
                 const sessionData = {
-                    ...(session?.map && {map: session.map}),
-                    ...(session?.featureGrid && {featureGrid: session.featureGrid})
+                    ...session
                 };
                 const contextSession = session?.context && {
                     ...session.context
@@ -149,7 +148,8 @@ export const loadContextAndMap = (action$, { getState = () => { } } = {}) =>
         // Hence the category is fetched from the param to provide correct category name to getResourceIdByName
         const resourceCategory = params.get("category") || 'CONTEXT';
         const sessionsEnabled = userSessionEnabledSelector(getState());
-        const flow = sessionsEnabled
+        // `getState()?.usersession?.session` if session plugins is not there, no need to to go the user session flow
+        const flow = sessionsEnabled && getState()?.usersession?.session
             ? createSessionFlow(mapId, contextName, resourceCategory, action$, getState)
             : Observable.merge(
                 Observable.of(clearMapTemplates()),

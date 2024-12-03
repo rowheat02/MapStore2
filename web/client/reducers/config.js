@@ -49,7 +49,7 @@ function mapConfig(state = null, action) {
         let hasVersion = action.config && action.config.version >= 2;
         // we get from the configuration what will be used as the initial state
         let mapState = action.legacy && !hasVersion ? ConfigUtils.convertFromLegacy(action.config) : ConfigUtils.normalizeConfig(action.config.map);
-
+        // console.log(state, mapState, action.config, 'checkmapload');
         let newMapState = {
             ...mapState,
             layers: mapState.layers.map( l => {

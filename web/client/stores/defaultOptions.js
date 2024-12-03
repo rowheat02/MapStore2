@@ -73,6 +73,7 @@ export const standardRootReducerFunc = ({
     if (action && action.type === CHANGE_BROWSER_PROPERTIES && newState.browser.mobile) {
         newState = merge(newState, mobileOverride);
     }
+    console.log(newState.layers, action, 'statecheck');
     return newState;
 };
 
