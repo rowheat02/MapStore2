@@ -148,7 +148,9 @@ axios.interceptors.request.use(config => {
 });
 
 axios.interceptors.response.use(response => response, (error) => {
-    if (error.config && error.config.autoDetectCORS) {
+     // check if error is due to cancellation on client side
+     const failedDueToCancel = axios.isCancel(error);
+     if (error.config && error.config.autoDetectCORS && !failedDueToCancel) {
         const urlParts = url.parse(error.config.url);
         const baseUrl = urlParts.protocol + "//" + urlParts.host + urlParts.pathname;
         if (corsDisabled.indexOf(baseUrl) === -1) {
