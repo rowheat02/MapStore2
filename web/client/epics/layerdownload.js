@@ -366,7 +366,6 @@ export const startFeatureExportDownload = (action$, store) =>
                 outputsExtractor: makeOutputsExtractor(referenceOutputExtractor)
             };
 
-            // const executor = isVectorLayer && propertyNames ? downloadWithAttributesFilter : download;
             const executor = download;
 
             return executor(action.url, wpsDownloadOptions, wpsExecuteOptions)
