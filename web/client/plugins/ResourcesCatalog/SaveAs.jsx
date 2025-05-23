@@ -168,7 +168,10 @@ function SaveAs({
 const saveAsConnect = connect(
     createStructuredSelector({
         user: userSelector,
-        pendingChanges: getPendingChanges
+        pendingChanges: () => ({
+            changes: true,
+            saveResource: true
+        })
     }),
     {
         onNotification: show,

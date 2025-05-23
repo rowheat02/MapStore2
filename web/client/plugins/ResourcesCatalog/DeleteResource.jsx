@@ -101,6 +101,7 @@ const deleteResourcesConnect = connect(
                 return props.resource;
             }
             const pendingChanges = getPendingChanges(state, { resourceType: 'MAP', ...props });
+            // const pendingChanges = {changes: true, saveResource: true};
             return pendingChanges?.resource;
         }
     }),

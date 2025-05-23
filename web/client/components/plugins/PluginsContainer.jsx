@@ -121,7 +121,8 @@ class PluginsContainer extends React.Component {
     };
 
     renderPlugins = (plugins) => {
-        return plugins
+        console.log(plugins, 'plugins-check');
+        return plugins?.filter((p) => ['Map', "Home", "DrawerMenu", "TOC", "SidebarMenu", "BrandNavbar"].includes(p?.name ?? p))
             // filter out plugins by localConfig hide property (the plugin is hidden when "hide" resolves to true)
             // @deprecated: use cfg.disablePluginIf to achieve the same behaviour
             .filter((Plugin) => !PluginsUtils.handleExpression(this.getState, this.props.plugins && this.props.plugins.requires, Plugin.hide))
@@ -136,6 +137,7 @@ class PluginsContainer extends React.Component {
                 {...this.props.params} {...Plugin.cfg} pluginCfg={Plugin.cfg} items={Plugin.items}/>);
     };
     render() {
+        console.log(this.props, 'props-plugins');
         const pluginsConfig = this.getPluginsConfig(this.props);
         if (pluginsConfig && pluginsConfig.length > 0) {
             const {bodyPlugins, ...containerPlugins} = PluginsUtils.mapPluginsPosition(pluginsConfig);

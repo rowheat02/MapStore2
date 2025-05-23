@@ -155,9 +155,11 @@ function BrandNavbar({
     logo
 }, context) {
     const { loadedPlugins } = context;
-    const configuredItems = usePluginItems({ items, loadedPlugins });
+    let configuredItems = usePluginItems({ items, loadedPlugins });
+    configuredItems = configuredItems?.filter(cp => ![ "ResourceDetails", 'DeleteResource'].includes(cp?.name));
     const pluginLeftMenuItems = configuredItems.filter(({ target }) => target === 'left-menu').map(item => ({ ...item, type: 'plugin' }));
     const pluginRightMenuItems = configuredItems.filter(({ target }) => target === 'right-menu').map(item => ({ ...item, type: 'plugin' }));
+    console.log(configuredItems, items, 'configuredItems');
     return (
         <>
             <FlexBox
