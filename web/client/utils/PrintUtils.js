@@ -23,26 +23,84 @@ import { generateEnvString } from './LayerLocalizationUtils';
 import { ServerTypes } from './LayersUtils';
 import PrintStyleParser from './styleparser/PrintStyleParser';
 import url from 'url';
+import ReactDOMServer from 'react-dom/server';
 
 import { getStore } from "./StateUtils";
 import { isLocalizedLayerStylesEnabledSelector, localizedLayerStylesEnvSelector } from '../selectors/localizedLayerStyles';
 import { currentLocaleLanguageSelector } from '../selectors/locale';
 import { printSpecificationSelector } from "../selectors/print";
+import assign from 'object-assign';
 import sortBy from "lodash/sortBy";
 import head from "lodash/head";
 import isNil from "lodash/isNil";
 import get from "lodash/get";
 import min from "lodash/min";
 import trimEnd from 'lodash/trimEnd';
+import React from 'react';
+
 
 import { getGridGeoJson } from "./grids/MapGridsUtils";
 import { isImageServerUrl } from './ArcGISUtils';
 import { getWMSLegendConfig, LEGEND_FORMAT } from './LegendUtils';
+import { getWellKnownNameImageFromSymbolizer, parseSymbolizerExpressions } from './styleparser/StyleParserUtils';
+import RuleLegendIcon from '../components/styleeditor/RuleLegendIcon';
 
 const defaultScales = getGoogleMercatorScales(0, 21);
 let PrintUtils;
 
 const printStyleParser = new PrintStyleParser();
+
+function svgToBase64(svgString) {
+    return new Promise((resolve) => {
+        const blob = new Blob([svgString], { type: 'image/svg+xml' });
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result); // result is data URI
+        reader.readAsDataURL(blob);
+    });
+}
+
+
+async function renderRuleLegendIcon(rule) {
+    const symbolizer = parseSymbolizerExpressions(rule?.symbolizers?.[0] || {}, { properties: {} });
+    let iconImage;
+    if (symbolizer.kind === 'Mark') {
+        iconImage = await getWellKnownNameImageFromSymbolizer(symbolizer);
+    } else if (symbolizer.kind === 'Icon' && symbolizer?.image) {
+        try {
+            const response = await fetch(symbolizer.image);
+            const blob = await response.blob();
+            iconImage = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => resolve({ src: reader.result });
+                reader.onerror = reject;
+                reader.readAsDataURL(blob);
+            });
+        } catch (e) {
+            iconImage = null;
+        }
+    }
+
+    const markup = ReactDOMServer.renderToStaticMarkup(
+        <RuleLegendIcon rule={rule} />
+    );
+
+    if (!markup) {
+        return null;
+    }
+    const container = typeof document !== 'undefined' && document.createElement('div');
+    if (container) {
+        container.innerHTML = markup;
+        if (iconImage?.src) {
+            return iconImage.src;
+        }
+        const svg = container.querySelector('svg');
+        if (svg) {
+            const svgString = new XMLSerializer().serializeToString(svg);
+            return await svgToBase64(svgString);
+        }
+    }
+    return null;
+}
 
 
 // Try to guess geomType, getting the first type available.
@@ -277,7 +335,7 @@ export const getLayersCredits = (layers) => {
  * @returns {object}      the mapfish print configuration to send to the server
  * @memberof utils.PrintUtils
  */
-export const getMapfishPrintSpecification = (rawSpec, state) => {
+export const getMapfishPrintSpecification = async(rawSpec, state) => {
     const {params, mergeableParams, excludeLayersFromLegend, ...baseSpec} = rawSpec;
     const spec = {...baseSpec, ...params};
     const printMap = state?.print?.map;
@@ -293,7 +351,8 @@ export const getMapfishPrintSpecification = (rawSpec, state) => {
         scaleZoom: projectedZoom
     };
     let legendLayers = spec.layers.filter(layer => !includes(excludeLayersFromLegend, layer.name));
-    legendLayers = PrintUtils.getMapfishLayersSpecification(legendLayers, projectedSpec, state, 'legend');
+    legendLayers = await PrintUtils.getMapfishLayersSpecification(legendLayers, projectedSpec, state, 'legend');
+
     return {
         "units": getUnits(spec.projection),
         "srs": normalizeSRS(spec.projection || 'EPSG:3857'),
@@ -303,7 +362,7 @@ export const getMapfishPrintSpecification = (rawSpec, state) => {
         "geodetic": false,
         "mapTitle": spec.name || '',
         "comment": spec.description || '',
-        "layers": PrintUtils.getMapfishLayersSpecification(spec.layers, projectedSpec, state, 'map'),
+        "layers": await PrintUtils.getMapfishLayersSpecification(spec.layers, projectedSpec, state, 'map'),
         "pages": [
             {
                 "center": [
@@ -579,9 +638,23 @@ export const getLegendIconsSize = (spec = {}, layer = {}) => {
  * @returns {array}         the configuration array for layers (or legend) to send to the print service.
  * @memberof utils.PrintUtils
  */
-export const getMapfishLayersSpecification = (layers, spec, state, purpose) => {
-    return layers.filter((layer) => PrintUtils.specCreators[layer.type] && PrintUtils.specCreators[layer.type][purpose])
-        .map((layer) => PrintUtils.specCreators[layer.type][purpose](layer, spec, state));
+// export const getMapfishLayersSpecification = (layers, spec, state, purpose) => {
+//     return layers.filter((layer) => PrintUtils.specCreators[layer.type] && PrintUtils.specCreators[layer.type][purpose])
+//         .map((layer) => PrintUtils.specCreators[layer.type][purpose](layer, spec, state));
+// };
+
+export const getMapfishLayersSpecification = async(layers, spec, state, purpose) => {
+    const filtered = layers.filter(layer =>
+        PrintUtils.specCreators[layer.type] &&
+        PrintUtils.specCreators[layer.type][purpose]
+    );
+
+    // Handle async/sync specCreators
+    return Promise.all(
+        filtered.map(layer =>
+            PrintUtils.specCreators[layer.type][purpose](layer, spec, state)
+        )
+    );
 };
 
 export const specCreators = {
@@ -598,7 +671,7 @@ export const specCreators = {
             "styles": [
                 layer.style || ''
             ],
-            "customParams": addAuthenticationParameter(PrintUtils.normalizeUrl(layer.url), Object.assign({
+            "customParams": addAuthenticationParameter(PrintUtils.normalizeUrl(layer.url), assign({
                 "TRANSPARENT": true,
                 ...getPrintVendorParams(layer),
                 "EXCEPTIONS": "application/vnd.ogc.se_inimage",
@@ -658,7 +731,40 @@ export const specCreators = {
             "EPSG:4326",
             spec.projection)
         }
-        )
+        ),
+        legend: async(layer) => {
+            // Using renderRuleLegendIcon approach
+            if (!layer?.style || layer.style.format !== 'geostyler' || !layer.style.body?.rules) {
+                return null;
+            }
+
+
+            const legendClasses = await Promise.all(layer.style.body.rules.map(async rule => {
+                const icon = await renderRuleLegendIcon(rule);
+                if (icon) {
+                    return {
+                        name: rule?.name,
+                        icons: [icon]
+                    };
+                }
+                return {
+                    name: rule?.name,
+                    icons: []
+                };
+            }));
+
+            if (legendClasses.length > 0) {
+                return {
+                    name: layer?.title ?? layer?.name,
+                    classes: legendClasses
+                };
+            }
+
+            return {
+                name: layer?.title ?? layer?.name,
+                classes: []
+            };
+        }
     },
     graticule: {
         map: (layer, spec, state) => {
