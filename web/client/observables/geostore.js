@@ -317,40 +317,35 @@ export const createCategory = (category, API = GeoStoreDAO) =>
 export const updateResource = ({ id, data, permission, metadata, linkedResources = {}, tags } = {}, API = GeoStoreDAO) => {
     const linkedResourcesKeys = Object.keys(linkedResources);
 
-    // update metadata
-    return Observable.forkJoin([
-        // update data and and permissions after data updated
-        Observable.defer(
-            () => API.putResourceMetadataAndAttributes(id, metadata)
-        ).switchMap(res =>
-            // update data if present. NOTE: sequence instead of parallel because of geostore issue #179
-            data
-                ? Observable.defer(
-                    () => API.putResource(id, data)
-                )
-                : Observable.of(res))
-            .switchMap((res) => permission ? Observable.defer(() => updateResourcePermissions(id, permission, API)) : Observable.of(res)),
-        // update linkedResources and permissions after linkedResources updated
-        (linkedResourcesKeys.length > 0 ? Observable.forkJoin(
-            ...linkedResourcesKeys.map(
-                attributeName => updateLinkedResource(id, attributeName, linkedResources[attributeName], permission, API)
-            )
-        ) : Observable.of([]))
-            .switchMap(() => permission ?
-                Observable.defer(() => updateOtherLinkedResourcesPermissions(id, linkedResources, permission, API)) :
-                Observable.of(-1)),
-
-        // update tags
-        Observable
-            .defer(() => Promise.all(
-                (tags || [])
-                    .map(({ tag, action }) => action === 'link'
-                        ? API.linkTagToResource(tag.id, id)
-                        : API.unlinkTagFromResource(tag.id, id)
+    // Step 1: Update metadata and data
+    return Observable.defer(() => API.putResourceMetadataAndAttributes(id, metadata))
+        .switchMap(res => data ? API.putResource(id, data) : Observable.of(res))
+        // Step 2: Update permissions if present (alone, no parallel)
+        .switchMap(() => permission ? updateResourcePermissions(id, permission, API) : Observable.of(-1))
+        // Step 3: Update linked resources and tags in parallel
+        .switchMap(() => Observable.forkJoin([
+            // Update linked resources
+            linkedResourcesKeys.length > 0
+                ? Observable.forkJoin(
+                    linkedResourcesKeys.map(attributeName =>
+                        updateLinkedResource(id, attributeName, linkedResources[attributeName], permission, API)
                     )
-            ))
-            .switchMap(() => Observable.of(-1))
-    ]).map(() => id);
+                ).switchMap(() =>
+                    permission ? updateOtherLinkedResourcesPermissions(id, linkedResources, permission, API) : Observable.of(-1)
+                )
+                : Observable.of(-1),
+            // Update tags
+            tags && tags.length > 0
+                ? Observable.defer(() => Promise.all(
+                    tags.map(({ tag, action }) =>
+                        action === 'link'
+                            ? API.linkTagToResource(tag.id, id)
+                            : API.unlinkTagFromResource(tag.id, id)
+                    )
+                )).switchMap(() => Observable.of(-1))
+                : Observable.of(-1)
+        ]))
+        .map(() => id);
 };
 
 /**
