@@ -77,7 +77,51 @@
   "userSessions": {
     "enabled": true
   },
-  "projectionDefs": [],
+  "gridFiles": {
+    "PENR2009": {
+      "path": "http://localhost:8000/PENR2009.gsb",
+      "type": "gsb",
+      "description": "ETRS89 transformation grid"
+    },
+    "es_ign_egm08-rednap": {
+      "path": "https://github.com/OSGeo/PROJ-data/blob/master/fr_ign/fr_ign_ntf_r93.tif",
+      "type": "geotiff"
+    }
+  },
+  "projectionDefs": [
+    {
+      "code": "EPSG:25830",
+      "def": "+proj=utm +zone=30 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs +nadgrids=es_ign_egm08-rednap",
+      "extent": [
+        166021.44,
+        0,
+        833978.56,
+        9329005.18
+      ],
+      "worldExtent": [
+        -18,
+        27,
+        5,
+        44
+      ]
+    },
+    {
+      "code": "EPSG:2154",
+      "def": "+proj=lcc +lat_1=49 +lat_2=44 +lat_0=46.5 +lon_0=3 +x_0=700000 +y_0=6600000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs",
+      "extent": [
+          -378305.81,
+          6093283.21,
+          1212610.74,
+          7186901.68
+      ],
+      "worldExtent": [
+          -9.86,
+          41.15,
+          10.38,
+          51.56
+      ]
+  }
+  ],
   "initialState": {
     "defaultState": {
       "catalog": {
@@ -564,7 +608,7 @@
           "editCRS": true,
           "showLabels": true,
           "showToggle": true,
-          "filterAllowedCRS": ["EPSG:4326", "EPSG:3857"],
+          "filterAllowedCRS": ["EPSG:4326", "EPSG:3857", "EPSG:25830"],
           "additionalCRS": {}
         }
       },
@@ -572,7 +616,7 @@
         "name": "CRSSelector",
         "cfg": {
           "additionalCRS": {},
-          "filterAllowedCRS": ["EPSG:4326", "EPSG:3857"],
+          "filterAllowedCRS": ["EPSG:4326", "EPSG:3857", "EPSG:25830"],
           "allowedRoles": ["ADMIN"]
         }
       },
