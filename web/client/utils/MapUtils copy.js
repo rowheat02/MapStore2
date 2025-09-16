@@ -834,6 +834,144 @@ export const getIdFromUri = (uri, regex = /data\/(\d+)/) => {
 };
 
 
+/**
+ * Determines if a field should be included in the comparison based on picked fields and exclusion rules.
+ * @param {string} path - The full path to the field (e.g., 'root.obj.key').
+ * @param {string} key - The key of the field being checked.
+ * @param {*} value - The value of the field.
+ * @param {object} rules - The rules object containing pickedFields and excludes.
+ * @param {string[]} rules.pickedFields - Array of field paths to include in the comparison.
+ * @param {object} rules.excludes - Object mapping parent paths to arrays of keys to exclude.
+ * @returns {boolean} True if the field should be included, false otherwise.
+ */
+export const filterFieldByRules = (path, key, value, { pickedFields = [], excludes = {} }) => {
+    if (value === undefined || value === null) {
+        return false;
+    }
+    if (pickedFields.some((field) => field.includes(path) || path.includes(field))) {
+        // Fix: check parent path for excludes
+        const parentPath = path.substring(0, path.lastIndexOf('.'));
+        if (excludes[parentPath] === undefined) {
+            return true;
+        }
+        if (excludes[parentPath] && excludes[parentPath].includes(key)) {
+            return false;
+        }
+        return true;
+    }
+    return false;
+};
+
+/**
+ * Prepares object entries for comparison by applying aliasing, filtering, and sorting.
+ * @param {object} obj - The object whose entries are to be prepared.
+ * @param {object} rules - The rules object containing aliases, pickedFields, and excludes.
+ * @param {string} parentKey - The parent key path for the current object.
+ * @returns {Array} Array of [key, value] pairs, filtered and sorted for comparison.
+ */
+export const prepareObjectEntries = (obj, rules, parentKey) => {
+    const safeObj = obj || {};
+    // First filter using the original keys, then apply aliasing
+    return Object.entries(safeObj)
+        .filter(([key, value]) => filterFieldByRules(`${parentKey}.${key}`, key, value, rules))
+        .map(([key, value]) => [rules.aliases && rules.aliases[key] || key, value])
+        .sort((a, b) => {
+            if (a[0] < b[0]) { return -1; }
+            if (a[0] > b[0]) { return 1; }
+            return 0;
+        });
+};
+
+// function that checks if a field has changed ( also includes the rules to prepare object for comparision)
+export const recursiveIsChangedWithRules = (a, b, rules, parentKey = 'root') => {
+    // Strict equality
+    if (a === b) {
+        return false;
+    }
+
+    // Handle arrays
+    if (Array.isArray(a)) {
+        if (!Array.isArray(b)) {
+            console.log(`DEBUG12: [ARRAY TYPE MISMATCH] at ${parentKey}:`, { a, b });
+            return true;
+        }
+        console.log(a.length !== b.length && parentKey !== 'root', 'DEBUG12: 1')
+        if (a.length !== b.length) {
+            console.log(`DEBUG12: [ARRAY LENGTH MISMATCH] at ${parentKey}:`, { aLength: a.length, bLength: b.length });
+            return true;
+        }
+        for (let i = 0; i < a.length; i++) {
+            if (recursiveIsChangedWithRules(a[i], b[i], rules, `${parentKey}[${i}]`)) {
+                console.log(`DEBUG12: [ARRAY ITEM CHANGED] at ${parentKey}[${i}]:`, { a: a[i], b: b[i] });
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // Handle objects
+    if (typeof a === 'object' && a !== null) {
+        const aEntries = prepareObjectEntries(a, rules, parentKey);
+        const bEntries = prepareObjectEntries(b || {}, rules, parentKey);
+
+        if (aEntries.length !== bEntries.length && parentKey === 'layers') {
+            console.log(`DEBUG12: [OBJECT KEYS LENGTH MISMATCH] at ${parentKey}:`, {
+                aKeys: aEntries.map(e => e[0]),
+                bKeys: bEntries.map(e => e[0])
+            });
+            return true;
+        }
+
+        for (let i = 0; i < aEntries.length; i++) {
+            const [key, value] = aEntries[i];
+            const bValue = bEntries[i]?.[1];
+            if (recursiveIsChangedWithRules(value, bValue, rules, `${parentKey}.${key}`)) {
+                console.log(`DEBUG12: [OBJECT FIELD CHANGED] at ${parentKey}.${key}:`, { a: value, b: bValue });
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Primitive values
+    if (a !== b) {
+        console.log(`DEBUG12: [PRIMITIVE VALUE MISMATCH] at ${parentKey}:`, { a, b });
+        return true;
+    }
+
+    return false;
+};
+
+
+/**
+ * @param {object} map1 - The original map configuration object.
+ * @param {object} map2 - The updated map configuration object.
+ * @returns {boolean} True if the considered fields are equal, false otherwise.
+ */
+// export const compareMapChanges = (map1 = {}, map2 = {}) => {
+//     console.log(map1, map2, 'map1, map2');
+//     const pickedFields = [
+//         'root.map.layers',
+//         'root.map.backgrounds',
+//         'root.map.text_search_config',
+//         'root.map.bookmark_search_config',
+//         'root.map.text_serch_config',
+//         'root.map.zoom',
+//         'root.widgetsConfig',
+//         'root.swipe'
+//     ];
+//     const aliases = {
+//         text_serch_config: 'text_search_config'
+//     };
+//     const excludes = {
+//         'root.map.layers[]': ['apiKey', 'time', 'args', 'fixed']
+//     };
+
+//     const isSame = !recursiveIsChangedWithRules(map1, map2, { pickedFields, aliases, excludes }, 'root');
+//     console.log(isSame, 'isSame', map1, map2);
+//     return isSame;
+// };
 export const prepareMapObjectToCompare = obj => {
     const skippedKeys = ['apiKey', 'time', 'args', 'fixed'];
     const shouldBeSkipped = (key) => skippedKeys.reduce((p, n) => p || key === n, false);
@@ -851,7 +989,6 @@ export const prepareMapObjectToCompare = obj => {
     });
 };
 
-
 /**
  * Method added for support old key with objects provided for compareMapChanges feature
  * like text_serch_config
@@ -866,83 +1003,28 @@ export const updateObjectFieldKey = (obj, oldKey, newKey) => {
     }
 };
 
-
-// Helper function to compare specific fields
-const compareFields = (map1, map2, fieldsToCompare, stepName) => {
-    const startTime = performance.now();
-
-    // const picked1 = pick(map1, fieldsToCompare);
-    // const picked2 = pick(map2, fieldsToCompare);
-
-    // Clone the data for deep comparison
-    const filtered1 = pick(cloneDeep(map1), fieldsToCompare);
-    const filtered2 = pick(cloneDeep(map2), fieldsToCompare);
-    console.log(filtered1, filtered2, map1, map2, 'filtered check ');
-
-
+export const compareMapChanges = (map1 = {}, map2 = {}) => {
+    const pickedFields = [
+        'map.layers',
+        'map.backgrounds',
+        'map.text_search_config',
+        'map.bookmark_search_config',
+        'map.text_serch_config',
+        'map.zoom',
+        'widgetsConfig',
+        'swipe'
+    ];
+    const filteredMap1 = pick(cloneDeep(map1), pickedFields);
+    const filteredMap2 = pick(cloneDeep(map2), pickedFields);
     // ABOUT: used for support text_serch_config field in old maps
-    if (filtered1.map) {
-        updateObjectFieldKey(filtered1.map, 'text_serch_config', 'text_search_config');
-    }
-    if (filtered2.map) {
-        updateObjectFieldKey(filtered2.map, 'text_serch_config', 'text_search_config');
-    }
+    updateObjectFieldKey(filteredMap1.map, 'text_serch_config', 'text_search_config');
+    updateObjectFieldKey(filteredMap2.map, 'text_serch_config', 'text_search_config');
 
-    prepareMapObjectToCompare(filtered1);
-    prepareMapObjectToCompare(filtered2);
-    // console.log(filtered1, filtered2, "FIltered1, filtered2");
-
-    const fieldsEqual = isEqual(filtered1, filtered2);
-    const duration = performance.now() - startTime;
-    console.log(`Log1 ${stepName} took ${duration.toFixed(2)}ms, result: ${fieldsEqual}`);
-
-    return { isEqual: fieldsEqual, duration };
+    prepareMapObjectToCompare(filteredMap1);
+    prepareMapObjectToCompare(filteredMap2);
+    console.log(map1, map2, 'filteredMap1, filteredMap2', filteredMap1, filteredMap2);
+    return isEqual(filteredMap1, filteredMap2);
 };
-
-// Optimized wrapper function
-export const compareMapChanges = (map1 = {}, map2 = {}, options = {}) => {
-    const startTime = performance.now();
-
-    // Default field configuration
-    const defaultFields = {
-        otherFields: [
-            'map.backgrounds',
-            'map.text_search_config',
-            'map.bookmark_search_config',
-            'map.text_serch_config',
-            'map.zoom',
-            'widgetsConfig',
-            'swipe'
-        ],
-        layerFields: ['map.layers']
-    };
-
-    const { otherFields = defaultFields.otherFields, layerFields = defaultFields.layerFields } = options;
-
-    // Compare other fields first (lightweight comparison)
-    const otherFieldsResult = compareFields(map1, map2, otherFields, 'Other fields comparison');
-
-    // If other fields are different, return early
-    if (!otherFieldsResult.isEqual) {
-        const endTime = performance.now();
-        const totalDuration = endTime - startTime;
-        console.log(`Log1 EARLY RETURN - other fields comparison failed, total time: ${totalDuration.toFixed(2)}ms`);
-        return false;
-    }
-
-    // STEP 2: Only if other fields are equal, compare layers
-    console.log(`Log1 Other fields comparison passed, now comparing layers...`);
-
-    const layersResult = compareFields(map1, map2, layerFields, 'Layers comparison');
-
-    const endTime = performance.now();
-    const totalDuration = endTime - startTime;
-    console.log(`Log1 Total comparison time: ${totalDuration.toFixed(2)}ms`);
-
-    return layersResult.isEqual;
-};
-
-
 /**
  * creates utilities for registering, fetching, executing hooks
  * used to override default ones in order to have a local hooks object

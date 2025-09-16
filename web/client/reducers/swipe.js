@@ -9,6 +9,7 @@
 
 import { SET_ACTIVE, SET_MODE, SET_SWIPE_TOOL_DIRECTION, SET_SPY_TOOL_RADIUS, SET_SWIPE_LAYER, SET_SWIPE_SLIDER_OPTIONS } from '../actions/swipe';
 import { MAP_CONFIG_LOADED } from '../actions/config';
+import { LOCATION_CHANGE } from 'connected-react-router';
 
 export default (state = {}, action) => {
     switch (action.type) {
@@ -44,6 +45,9 @@ export default (state = {}, action) => {
             ...state,
             sliderOptions: action.options
         };
+    }
+    case LOCATION_CHANGE: {
+        return {};
     }
     default:
         return state;

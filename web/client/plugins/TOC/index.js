@@ -368,6 +368,7 @@ function TOC({
     init,
     onOpen
 }, context) {
+    // return null;
     const activateParameter = (allow, activate) => {
         const isUserAdmin = user && user.role === 'ADMIN' || false;
         return (allow || isUserAdmin) ? activate : false;

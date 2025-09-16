@@ -14,7 +14,12 @@ import {
     parseResourceProperties,
     THUMBNAIL_DATA_KEY,
     DETAILS_DATA_KEY,
-    parseClonedResourcePayload
+    parseClonedResourcePayload,
+    computeResourceDiff,
+    composeMapConfiguration,
+    compareMapDataChanges,
+    compareDashboardDataChanges,
+    computeSaveResource
 } from '../GeostoreUtils';
 import expect from 'expect';
 
@@ -242,4 +247,180 @@ describe('GeostoreUtils', () => {
             }
         });
     });
+    describe.only('GeostoreUtils - New Performance Functions', () => {
+        describe('computeResourceDiff', () => {
+            it('should compute resource differences correctly', () => {
+                const initialResource = {
+                    id: 1,
+                    name: 'Initial Map',
+                    description: 'Initial description',
+                    attributes: {
+                        thumbnail: '/thumb1.jpg',
+                        author: 'John Doe'
+                    },
+                    tags: [{ id: 1, name: 'test' }]
+                };
+
+                const resource = {
+                    id: 1,
+                    name: 'Updated Map',
+                    description: 'Updated description',
+                    attributes: {
+                        thumbnail: '/thumb2.jpg',
+                        author: 'Jane Doe',
+                        newAttr: 'new value'
+                    },
+                    tags: [{ id: 1, name: 'test' }, { id: 2, name: 'updated' }]
+                };
+
+                const result = computeResourceDiff(initialResource, resource);
+
+                expect(result.pendingChanges).toExist();
+                expect(result.pendingChanges.name).toBe('Updated Map');
+                expect(result.pendingChanges.description).toBe('Updated description');
+                expect(result.mergedAttributes).toExist();
+                expect(result.mergedTags).toExist();
+                expect(result.mergedTags.length).toBe(1); // Only new tag
+            });
+        });
+
+        describe('composeMapConfiguration', () => {
+            it('should compose map configuration from raw data', () => {
+                const mapData = {
+                    map: {
+                        center: { x: 0, y: 0, crs: 'EPSG:4326' },
+                        zoom: 10,
+                        projection: 'EPSG:4326'
+                    },
+                    layers: [{ id: 'layer1', type: 'wms', name: 'Layer 1' }],
+                    groups: [{ id: 'group1', title: 'Group 1', nodes: ['layer1'] }],
+                    backgrounds: [{ id: 'bg1', type: 'osm', title: 'OpenStreetMap' }],
+                    textSearchConfig: { searchText: 'test' },
+                    bookmarkSearchConfig: { searchText: 'bookmark' },
+                    additionalOptions: { custom: 'option' }
+                };
+
+                const result = composeMapConfiguration(mapData);
+                expect(typeof result).toBe('object');
+                expect(result.map).toExist();
+                expect(result.map.layers).toExist();
+                expect(result.custom).toEqual('option');
+                expect(result.map.bookmark_search_config).toEqual({ searchText: 'bookmark' });
+
+            });
+
+        });
+
+        describe('compareMapDataChanges', () => {
+            it('should detect map data changes', () => {
+                const currentMapData = {
+                    version: 2,
+                    map: { center: { x: 0, y: 0, crs: 'EPSG:4326' }, zoom: 10 }
+                };
+                const initialMapConfig = {
+                    version: 2,
+                    map: { center: { x: 0, y: 0, crs: 'EPSG:4326' }, zoom: 12 }
+                };
+
+                const result = compareMapDataChanges(currentMapData, initialMapConfig);
+                console.log(result, 'resultbool');
+
+                expect(typeof result).toBe('boolean');
+                // as zoom value is different
+                expect(result).toBe(true);
+            });
+
+            it('should return false for no current data', () => {
+                const currentMapData = {
+                    version: 2,
+                    map: { center: { x: 0, y: 0, crs: 'EPSG:4326' }, zoom: 10 }
+                };
+                const initialMapConfig = {
+                    version: 2,
+                    map: { center: { x: 0, y: 0, crs: 'EPSG:4326' }, zoom: 10 }
+                };
+
+                const result = compareMapDataChanges(currentMapData, initialMapConfig);
+
+                expect(result).toBe(false);
+            });
+        });
+
+        describe('compareDashboardDataChanges', () => {
+            it('should detect dashboard data changes', () => {
+                const currentDashboardData = {
+                    widgets: [{ id: 'widget1', title: 'Widget 1' }],
+                    layouts: { md: { widget1: { x: 0, y: 1 } } }
+                };
+                const initialDashboardData = {
+                    widgets: [{ id: 'widget2', title: 'Widget 2' }],
+                    layouts: { md: { widget1: { x: 0, y: 1 } } }
+                };
+
+                const result = compareDashboardDataChanges(currentDashboardData, initialDashboardData);
+
+                expect(typeof result).toBe('boolean');
+                // as Widget changed, so should be true
+                expect(result).toBe(true);
+            });
+
+            it('should return false for no changes', () => {
+                const currentDashboardData = {
+                    widgets: [{ id: 'widget1', title: 'Widget 1' }],
+                    layouts: { md: { widget1: { x: 0, y: 0 } } }
+                };
+                const initialDashboardData = {
+                    widgets: [{ id: 'widget1', title: 'Widget 1' }],
+                    layouts: { md: { widget1: { x: 0, y: 0 } } }
+                };
+
+                const result = compareDashboardDataChanges(currentDashboardData, initialDashboardData);
+
+                expect(result).toBe(false);
+            });
+        });
+
+        describe('computeSaveResource', () => {
+            it('should compute save resource correctly', () => {
+                const initialResource = {
+                    id: 1,
+                    name: 'Initial Map',
+                    category: { name: 'MAP' },
+                    permissions: { canEdit: true }
+                };
+                const resource = {
+                    id: 1,
+                    name: 'Updated Map',
+                    description: 'Updated Description'
+                };
+                const resourceData = {
+                    payload: {
+                        map: { center: { x: 0, y: 0, crs: 'EPSG:4326' }, zoom: 10 },
+                        layers: [],
+                        groups: [],
+                        backgrounds: [],
+                        textSearchConfig: {},
+                        bookmarkSearchConfig: {},
+                        additionalOptions: {}
+                    },
+                    resourceType: 'MAP'
+                };
+
+                const result = computeSaveResource(initialResource, resource, resourceData, 'MAP');
+
+                expect(result).toExist();
+                expect(result.id).toBe(1);
+                expect(result.category).toBe('MAP');
+                expect(result.permission).toEqual({ canEdit: true });
+            });
+
+            it('should handle empty inputs gracefully', () => {
+                const result = computeSaveResource({}, {}, {}, 'MAP');
+
+                expect(result).toExist();
+                expect(result.id).toBe(undefined);
+            });
+        });
+    });
+
 });

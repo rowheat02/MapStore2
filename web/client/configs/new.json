@@ -134,6 +134,13 @@
         "fixed": true,
         "type": "empty",
         "visibility": false
+      },
+      {
+        "group": "background",
+        "provider": "ellipsoid",
+        "title": "Ellipsoid",
+        "type": "terrain",
+        "visibility": true
       }
     ]
   }

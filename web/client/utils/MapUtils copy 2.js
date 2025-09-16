@@ -834,6 +834,358 @@ export const getIdFromUri = (uri, regex = /data\/(\d+)/) => {
 };
 
 
+/**
+ * Determines if a field should be included in the comparison based on picked fields and exclusion rules.
+ * @param {string} path - The full path to the field (e.g., 'root.obj.key').
+ * @param {string} key - The key of the field being checked.
+ * @param {*} value - The value of the field.
+ * @param {object} rules - The rules object containing pickedFields and excludes.
+ * @param {string[]} rules.pickedFields - Array of field paths to include in the comparison.
+ * @param {object} rules.excludes - Object mapping parent paths to arrays of keys to exclude.
+ * @returns {boolean} True if the field should be included, false otherwise.
+ */
+export const filterFieldByRules1 = (path, key, value, { pickedFields = [], excludes = {} }) => {
+    if (value === undefined || value === null) {
+        return false;
+    }
+    if (pickedFields.some((field) => field.includes(path) || path.includes(field))) {
+        // Fix: check parent path for excludes
+        const parentPath = path.substring(0, path.lastIndexOf('.'));
+        if (excludes[parentPath] === undefined) {
+            return true;
+        }
+        if (excludes[parentPath] && excludes[parentPath].includes(key)) {
+            return false;
+        }
+        return true;
+    }
+    return false;
+};
+// ==============================
+// Comparison utilities (functions)
+// ==============================
+
+// Collapse any array index/label to [] so excludes like "root.map.layers[]"
+// apply to all elements (e.g., root.map.layers[3], root.map.layers[id:foo]).
+const normalizePath = (p) =>
+    p
+        .replace(/\[id:[^\]]+\]/g, "[]")
+        .replace(/\[#\d+\]/g, "[]")
+        .replace(/\[\d+\]/g, "[]");
+
+// Prefer stable identifiers for array items: id → name → title
+const pickIdentifier = (obj) => {
+    if (!obj || typeof obj !== "object") return null;
+    if (obj.id !== undefined) return ["id", String(obj.id)];
+    if (obj.name !== undefined) return ["name", String(obj.name)];
+    if (obj.title !== undefined) return ["title", String(obj.title)];
+    return null;
+};
+
+// Human-friendly label for paths: [id:...], [name:...], [title:...], or [#index]
+const labelForItem = (item, index) => {
+    const ident = pickIdentifier(item);
+    if (ident) return `[${ident[0]}:${ident[1]}]`;
+    return `[#${index}]`;
+};
+
+const isPlainObject = (v) => v && typeof v === "object" && !Array.isArray(v);
+
+const pathUnderPicked = (path, picked = []) =>
+    picked.some(
+        (f) =>
+            path === f ||
+        path.startsWith(f + ".") ||
+        path.startsWith(f + "[") // arrays under picked path
+    );
+
+/** Deep emptiness check:
+   * - null / undefined / "" => empty
+   * - Array => empty if length=0 OR all elements are empty
+   * - Object => empty if it has no keys OR all values are empty
+   * - Other primitives => not empty
+   */
+const isEmptyDeep = (v) => {
+    if (v === null || v === undefined || v === false) return true;          // null or undefined
+    if (typeof v === "string") return v.length === 0;
+    if (Array.isArray(v)) return v.length === 0 || v.every(isEmptyDeep);
+    if (isPlainObject(v)) {
+        const keys = Object.keys(v);
+        return keys.length === 0 || keys.every((k) => isEmptyDeep(v[k]));
+    }
+    return false;
+};
+
+/**
+   * Determines if a field should be included in the comparison based on picked fields and exclusion rules.
+   * NOTE: Under any picked field, we DO NOT exclude keys just because value is undefined/null.
+   */
+export const filterFieldByRules = (
+    path,
+    key,
+    value,
+    { pickedFields = [], excludes = {} }
+) => {
+    const underPicked = pathUnderPicked(path, pickedFields);
+
+    // If not under a picked field, drop undefined/null quickly
+    if (!underPicked && (value === undefined || value === null)) return false;
+
+    // Include only if the field is under at least one picked field path
+    const inPicked = pickedFields.some(
+        (field) => field.includes(path) || path.includes(field)
+    );
+    if (!inPicked) return false;
+
+    // Apply excludes on the normalized parent path
+    const parentPath = path.substring(0, path.lastIndexOf(".")) || path;
+    const nParent = normalizePath(parentPath);
+    const ex = excludes[nParent];
+    if (!ex) return true;
+
+    return !ex.includes(key);
+};
+
+/**
+   * Prepare object entries for comparison by:
+   * 1) (Conditionally) dropping "effectively empty" values (via isEmptyDeep)
+   *    — but NOT when the entry is under a picked field.
+   * 2) Applying pickedFields/excludes
+   * 3) Applying aliasing
+   * (No sorting; downstream compares by key.)
+   */
+export const prepareObjectEntries = (obj, rules, parentKey) => {
+    const safeObj = obj || {};
+    const picked = rules?.pickedFields || [];
+
+    return Object.entries(safeObj)
+    // Drop empties unless the entry is under a picked field
+        .filter(([key, value]) => {
+            const fullPath = `${parentKey}.${key}`;
+            const underPicked = pathUnderPicked(fullPath, picked);
+            return underPicked ? true : !isEmptyDeep(value);
+        })
+    // Then apply rules-based inclusion/exclusion
+        .filter(([key, value]) =>
+            filterFieldByRules(`${parentKey}.${key}`, key, value, rules)
+        )
+    // Apply aliases
+        .map(([key, value]) => [
+            (rules.aliases && rules.aliases[key]) || key,
+            value
+        ]);
+};
+
+/**
+   * Deep diff with rules:
+   * - Only compare fields under `pickedFields`.
+   * - Aliases supported.
+   * - Excludes keyed by normalized parent path, e.g. "root.map.layers[]".
+   * - Arrays of objects matched by id → name → title; fallback to index for unidentified items.
+   * - Logs **only once** at the exact deepest detection site (the first break).
+   * - In **layers scope**: build keys from BOTH sides and compare only keys whose values are
+   *   NOT `undefined` on either side (skip if either side is undefined).
+   *   Elsewhere: key-set mismatch remains a break.
+   *
+   * @returns {boolean} true if changed; false if equal under rules
+   */
+export const recursiveIsChangedWithRules = (
+    a,
+    b,
+    rules,
+    parentKey = "root",
+    _once = { logged: false } // pass the same object down to ensure single log
+) => {
+    const logOnce = (reason, detail) => {
+        if (_once.logged) return;
+        _once.logged = true;
+        console.log(`DEBUG12: ${reason} at ${parentKey}:`, detail);
+    };
+
+    // Treat "effectively empty" vs "effectively empty" as equal
+    const aEmpty = isEmptyDeep(a);
+    const bEmpty = isEmptyDeep(b);
+    if (aEmpty && bEmpty) return false;
+
+    // If one side is empty and the other isn't, that's a break
+    if (aEmpty !== bEmpty) {
+        logOnce("[VALUE EMPTY vs NON-EMPTY]", { a, b });
+        return true;
+    }
+
+    // Fast path
+    if (a === b) return false;
+
+    // Arrays
+    if (Array.isArray(a)) {
+        if (!Array.isArray(b)) {
+            logOnce("[ARRAY TYPE MISMATCH]", { a, b });
+            return true;
+        }
+
+        if (a.length !== b.length) {
+            logOnce("[ARRAY LENGTH MISMATCH]", { aLength: a.length, bLength: b.length });
+            return true;
+        }
+
+        // Try identifier-based matching first
+        const aIdents = a.map(pickIdentifier);
+        const bIdents = b.map(pickIdentifier);
+
+        // Build multi-bucket index for B (handles duplicates)
+        const bBuckets = new Map(); // key: "key::val" -> array of indices
+        for (let j = 0; j < b.length; j++) {
+            const id = bIdents[j];
+            if (!id) continue;
+            const key = `${id[0]}::${id[1]}`;
+            if (!bBuckets.has(key)) bBuckets.set(key, []);
+            bBuckets.get(key).push(j);
+        }
+
+        // Pass 1: match items with identifiers
+        for (let i = 0; i < a.length; i++) {
+            const id = aIdents[i];
+            if (!id) continue;
+            const key = `${id[0]}::${id[1]}`;
+            const candidates = bBuckets.get(key);
+            if (!candidates || candidates.length === 0) {
+                logOnce("[ARRAY ITEM MISSING BY IDENTIFIER]", { identifier: { [id[0]]: id[1] } });
+                return true;
+            }
+            const j = candidates.shift();
+            if (
+                recursiveIsChangedWithRules(
+                    a[i],
+                    b[j],
+                    rules,
+                    `${parentKey}${labelForItem(a[i], i)}`,
+                    _once
+                )
+            ) {
+                // Deeper call already logged the precise break; just bubble up.
+                return true;
+            }
+        }
+
+        // Pass 2: compare remaining (unidentified) by index order
+        const aNoId = [];
+        const bNoId = [];
+        for (let i = 0; i < a.length; i++) if (!aIdents[i]) aNoId.push(i);
+        for (let j = 0; j < b.length; j++) if (!bIdents[j]) bNoId.push(j);
+
+        if (aNoId.length !== bNoId.length) {
+            logOnce("[ARRAY UNIDENTIFIED COUNT MISMATCH]", {
+                aUnidentified: aNoId.length,
+                bUnidentified: bNoId.length
+            });
+            return true;
+        }
+
+        for (let k = 0; k < aNoId.length; k++) {
+            const i = aNoId[k];
+            const j = bNoId[k];
+            if (
+                recursiveIsChangedWithRules(
+                    a[i],
+                    b[j],
+                    rules,
+                    `${parentKey}${labelForItem(a[i], i)}`,
+                    _once
+                )
+            ) {
+                // Deeper call already logged.
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Objects
+    if (isPlainObject(a)) {
+        const aEntries = prepareObjectEntries(a, rules, parentKey);
+        const bEntries = prepareObjectEntries(b || {}, rules, parentKey);
+
+        const aMap = new Map(aEntries);
+        const bMap = new Map(bEntries);
+
+        // Detect we're under layers (including nested children)
+        const nCurrent = normalizePath(parentKey);
+        const underLayers = nCurrent.startsWith("root.map.layers[]");
+
+        // if (underLayers) {
+        // // Build keys from BOTH a & b, then keep only keys that exist on both sides
+        // // AND whose values are not `undefined` on either side.
+        //     const unionKeys = new Set([...aMap.keys(), ...bMap.keys()]);
+        //     const keys = [...unionKeys].filter((k) => {
+        //         if (!aMap.has(k) || !bMap.has(k)) return false;
+        //         const aVal = aMap.get(k);
+        //         const bVal = bMap.get(k);
+        //         return !(aVal === undefined || bVal === undefined);
+        //     });
+
+        //     for (const key of keys) {
+        //         const aVal = aMap.get(key);
+        //         const bVal = bMap.get(key);
+        //         if (
+        //             recursiveIsChangedWithRules(
+        //                 aVal,
+        //                 bVal,
+        //                 rules,
+        //                 `${parentKey}.${key}`,
+        //                 _once
+        //             )
+        //         ) {
+        //             // Deeper call already logged the exact reason/path.
+        //             return true;
+        //         }
+        //     }
+        //     // Any key present only on one side or undefined on either side is ignored in layers scope.
+        //     return false;
+        // }
+        // Default behavior elsewhere: key-set mismatch is a break.
+        const aKeys = new Set(aMap.keys());
+        const bKeys = new Set(bMap.keys());
+        if (aKeys.size !== bKeys.size) {
+            const aOnly = [...aKeys].filter((k) => !bKeys.has(k));
+            const bOnly = [...bKeys].filter((k) => !aKeys.has(k));
+            logOnce("[OBJECT KEY SET MISMATCH]", { aOnly, bOnly });
+            return true;
+        }
+
+        // Compare union (same size, but still check values)
+        for (const key of aMap.keys()) {
+            if (!bMap.has(key)) {
+                logOnce("[OBJECT MISSING KEY]", { missingKey: key });
+                return true;
+            }
+            const aVal = aMap.get(key);
+            const bVal = bMap.get(key);
+            if (
+                recursiveIsChangedWithRules(
+                    aVal,
+                    bVal,
+                    rules,
+                    `${parentKey}.${key}`,
+                    _once
+                )
+            ) {
+                return true;
+            }
+        }
+        return false;
+
+    }
+
+    // Primitives
+    if (a !== b) {
+        logOnce("[PRIMITIVE VALUE MISMATCH]", { a, b });
+        return true;
+    }
+
+    return false;
+};
+
 export const prepareMapObjectToCompare = obj => {
     const skippedKeys = ['apiKey', 'time', 'args', 'fixed'];
     const shouldBeSkipped = (key) => skippedKeys.reduce((p, n) => p || key === n, false);
@@ -851,6 +1203,42 @@ export const prepareMapObjectToCompare = obj => {
     });
 };
 
+/**
+   * Wrapper to compare two map configs using your rule set.
+   * Returns true if considered equal under rules, false otherwise.
+   * Only the deepest break logs once.
+   */
+export const compareMapChanges = (map1 = {}, map2 = {}) => {
+    const pickedFields = [
+        "root.map.layers",
+        "root.map.backgrounds",
+        "root.map.text_search_config",
+        "root.map.bookmark_search_config",
+        "root.map.text_serch_config",
+        "root.map.zoom",
+        "root.widgetsConfig",
+        "root.swipe"
+    ];
+
+    const aliases = {
+        text_serch_config: "text_search_config"
+    };
+
+    const excludes = {
+        // Applies to any element of layers thanks to normalizePath()
+        "root.map.layers[]": ["apiKey", "time", "args", "fixed"]
+    };
+    // console.log(map1, map2);
+
+    return !recursiveIsChangedWithRules(
+        map1,
+        map2,
+        { pickedFields, aliases, excludes },
+        "root",
+        { logged: false }
+    );
+};
+
 
 /**
  * Method added for support old key with objects provided for compareMapChanges feature
@@ -866,80 +1254,27 @@ export const updateObjectFieldKey = (obj, oldKey, newKey) => {
     }
 };
 
-
-// Helper function to compare specific fields
-const compareFields = (map1, map2, fieldsToCompare, stepName) => {
-    const startTime = performance.now();
-
-    // const picked1 = pick(map1, fieldsToCompare);
-    // const picked2 = pick(map2, fieldsToCompare);
-
-    // Clone the data for deep comparison
-    const filtered1 = pick(cloneDeep(map1), fieldsToCompare);
-    const filtered2 = pick(cloneDeep(map2), fieldsToCompare);
-    console.log(filtered1, filtered2, map1, map2, 'filtered check ');
-
-
+export const compareMapChanges1 = (map1 = {}, map2 = {}) => {
+    const pickedFields = [
+        'map.layers',
+        'map.backgrounds',
+        'map.text_search_config',
+        'map.bookmark_search_config',
+        'map.text_serch_config',
+        'map.zoom',
+        'widgetsConfig',
+        'swipe'
+    ];
+    const filteredMap1 = pick(cloneDeep(map1), pickedFields);
+    const filteredMap2 = pick(cloneDeep(map2), pickedFields);
     // ABOUT: used for support text_serch_config field in old maps
-    if (filtered1.map) {
-        updateObjectFieldKey(filtered1.map, 'text_serch_config', 'text_search_config');
-    }
-    if (filtered2.map) {
-        updateObjectFieldKey(filtered2.map, 'text_serch_config', 'text_search_config');
-    }
+    updateObjectFieldKey(filteredMap1.map, 'text_serch_config', 'text_search_config');
+    updateObjectFieldKey(filteredMap2.map, 'text_serch_config', 'text_search_config');
 
-    prepareMapObjectToCompare(filtered1);
-    prepareMapObjectToCompare(filtered2);
-    // console.log(filtered1, filtered2, "FIltered1, filtered2");
-
-    const fieldsEqual = isEqual(filtered1, filtered2);
-    const duration = performance.now() - startTime;
-    console.log(`Log1 ${stepName} took ${duration.toFixed(2)}ms, result: ${fieldsEqual}`);
-
-    return { isEqual: fieldsEqual, duration };
-};
-
-// Optimized wrapper function
-export const compareMapChanges = (map1 = {}, map2 = {}, options = {}) => {
-    const startTime = performance.now();
-
-    // Default field configuration
-    const defaultFields = {
-        otherFields: [
-            'map.backgrounds',
-            'map.text_search_config',
-            'map.bookmark_search_config',
-            'map.text_serch_config',
-            'map.zoom',
-            'widgetsConfig',
-            'swipe'
-        ],
-        layerFields: ['map.layers']
-    };
-
-    const { otherFields = defaultFields.otherFields, layerFields = defaultFields.layerFields } = options;
-
-    // Compare other fields first (lightweight comparison)
-    const otherFieldsResult = compareFields(map1, map2, otherFields, 'Other fields comparison');
-
-    // If other fields are different, return early
-    if (!otherFieldsResult.isEqual) {
-        const endTime = performance.now();
-        const totalDuration = endTime - startTime;
-        console.log(`Log1 EARLY RETURN - other fields comparison failed, total time: ${totalDuration.toFixed(2)}ms`);
-        return false;
-    }
-
-    // STEP 2: Only if other fields are equal, compare layers
-    console.log(`Log1 Other fields comparison passed, now comparing layers...`);
-
-    const layersResult = compareFields(map1, map2, layerFields, 'Layers comparison');
-
-    const endTime = performance.now();
-    const totalDuration = endTime - startTime;
-    console.log(`Log1 Total comparison time: ${totalDuration.toFixed(2)}ms`);
-
-    return layersResult.isEqual;
+    prepareMapObjectToCompare(filteredMap1);
+    prepareMapObjectToCompare(filteredMap2);
+    console.log(map1, map2, 'filteredMap1, filteredMap2', filteredMap1, filteredMap2);
+    return isEqual(filteredMap1, filteredMap2);
 };
 
 
