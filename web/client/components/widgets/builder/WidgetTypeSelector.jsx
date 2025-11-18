@@ -48,6 +48,12 @@ const DEFAULT_TYPES = [{
     glyph: "list",
     caption: <Message msgId={"widgets.types.legend.caption"} />,
     className: "ms-widget-selector-legend"
+}, {
+    title: <Message msgId={"widgets.types.filter.title"} />,
+    type: "filter",
+    glyph: "filter",
+    caption: <Message msgId={"widgets.types.filter.caption"} />,
+    className: "ms-widget-selector-filter"
 }];
 
 export default ({widgetTypes = DEFAULT_TYPES, typeFilter = () => true, onSelect = () => {}}) =>
