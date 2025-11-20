@@ -7,16 +7,22 @@
  */
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Button } from 'react-bootstrap';
+import FlexBox from '../../../../layout/FlexBox';
+import Text from '../../../../layout/Text';
+import { getTagColorVariables } from '../../../../../utils/ResourcesFiltersUtils';
 
 const FilterChipList = ({
     filterName,
     items = [],
     selectionMode = 'multiple',
     selectedValues = [],
-    onSelectionChange = () => {}
+    onSelectionChange = () => {},
+    layoutDirection = 'vertical',
+    layoutMaxHeight,
+    selectedColor = 'var(--ms-button-primary-bg)'
 }) => {
     const isSingle = selectionMode === 'single';
+    const isVertical = layoutDirection === 'vertical';
 
     const handleToggle = (value) => {
         const alreadySelected = selectedValues.includes(value);
@@ -34,28 +40,73 @@ const FilterChipList = ({
         onSelectionChange(next);
     };
 
+    const getTagStyle = (active) => {
+        return active
+            ? getTagColorVariables(selectedColor)
+            : getTagColorVariables('#eee');
+    };
+
+    const getChipClassNames = (active, disabled) => {
+        return [
+            'ms-filter-chip-list-item',
+            active ? '_is-active' : undefined,
+            disabled ? '_is-disabled' : '_pointer'
+        ].filter(Boolean);
+    };
+
+    const handleKeyToggle = (event, id, disabled) => {
+        if (disabled) {
+            return;
+        }
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleToggle(id);
+        }
+    };
+
+    const listStyle = layoutMaxHeight
+        ? { maxHeight: layoutMaxHeight, overflowY: 'auto' }
+        : undefined;
+
     return (
-        <div className="ms-filter-chip-list">
+        <FlexBox column gap="xs" className="ms-filter-chip-list _padding-sm">
             {filterName ? (
-                <div className="ms-filter-chip-list-title">{filterName}</div>
+                <Text fontSize="sm" className="ms-filter-chip-list-title">{filterName}</Text>
             ) : null}
-            <div className="ms-filter-chip-list-items">
+            <FlexBox
+                component="ul"
+                gap="xs"
+                wrap={!isVertical}
+                column={isVertical}
+                className="ms-filter-chip-list-items"
+                style={listStyle}
+            >
                 {items.map(({ id, label, disabled }) => {
                     const active = selectedValues.includes(id);
+                    const chipStyle = {
+                        display: 'inline-flex',
+                        alignSelf: 'flex-start',
+                        ...getTagStyle(active)
+                    };
                     return (
-                        <Button
+                        <Text
                             key={id}
-                            bsStyle={active ? 'primary' : 'default'}
-                            className="ms-filter-chip-list-item"
-                            disabled={disabled}
-                            onClick={() => handleToggle(id)}
+                            component="li"
+                            fontSize="sm"
+                            role={isSingle ? 'radio' : 'checkbox'}
+                            aria-checked={active}
+                            tabIndex={disabled ? -1 : 0}
+                            onClick={() => !disabled && handleToggle(id)}
+                            onKeyDown={(event) => handleKeyToggle(event, id, disabled)}
+                            classNames={['ms-tag', ...getChipClassNames(active, disabled)]}
+                            style={chipStyle}
                         >
                             {label}
-                        </Button>
+                        </Text>
                     );
                 })}
-            </div>
-        </div>
+            </FlexBox>
+        </FlexBox>
     );
 };
 
@@ -70,7 +121,10 @@ FilterChipList.propTypes = {
     selectedValues: PropTypes.arrayOf(
         PropTypes.oneOfType([PropTypes.string, PropTypes.number])
     ),
-    onSelectionChange: PropTypes.func
+    onSelectionChange: PropTypes.func,
+    layoutDirection: PropTypes.oneOf(['horizontal', 'vertical']),
+    layoutMaxHeight: PropTypes.oneOfType([PropTypes.number, PropTypes.string]),
+    selectedColor: PropTypes.string
 };
 
 export default FilterChipList;

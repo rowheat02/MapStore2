@@ -14,9 +14,12 @@ const FilterCheckboxList = ({
     items = [],
     selectionMode = 'multiple',
     selectedValues = [],
-    onSelectionChange = () => {}
+    onSelectionChange = () => {},
+    layoutDirection = 'vertical',
+    layoutMaxHeight
 }) => {
     const isSingle = selectionMode === 'single';
+    const isInline = layoutDirection === 'horizontal';
 
     const handleToggle = (value) => {
         if (isSingle) {
@@ -32,6 +35,15 @@ const FilterCheckboxList = ({
 
     const ControlComponent = isSingle ? Radio : Checkbox;
 
+    const containerClassName = [
+        'ms-filter-checkbox-list-items',
+        layoutDirection === 'horizontal' ? '_direction-horizontal' : '_direction-vertical'
+    ].filter(Boolean).join(' ');
+
+    const containerStyle = layoutMaxHeight
+        ? { maxHeight: layoutMaxHeight, overflowY: 'auto' }
+        : undefined;
+
     return (
         <FormGroup className="ms-filter-checkbox-list">
             {filterName ? (
@@ -39,11 +51,11 @@ const FilterCheckboxList = ({
                     {filterName}
                 </ControlLabel>
             ) : null}
-            <div className="ms-filter-checkbox-list-items">
+            <div className={containerClassName} style={containerStyle}>
                 {items.map(({ id, label, description, disabled }) => (
                     <ControlComponent
                         key={id}
-                        inline
+                        inline={isInline}
                         checked={selectedValues.includes(id)}
                         onChange={() => handleToggle(id)}
                         disabled={disabled}
@@ -73,7 +85,9 @@ FilterCheckboxList.propTypes = {
     selectedValues: PropTypes.arrayOf(
         PropTypes.oneOfType([PropTypes.string, PropTypes.number])
     ),
-    onSelectionChange: PropTypes.func
+    onSelectionChange: PropTypes.func,
+    layoutDirection: PropTypes.oneOf(['horizontal', 'vertical']),
+    layoutMaxHeight: PropTypes.oneOfType([PropTypes.number, PropTypes.string])
 };
 
 export default FilterCheckboxList;

@@ -17,6 +17,7 @@ import BuilderHeader from './BuilderHeader';
 import Message from '../../components/I18N/Message';
 import { Button, Glyphicon, FormGroup, ControlLabel, InputGroup, FormControl } from 'react-bootstrap';
 import useFilterManager from './hooks/useFilterManager';
+import FilterView from './FilterView';
 
 const HeaderToolbar = ({ onReset = () => {} }) => (
     <div className="ms-filter-builder-toolbar">
@@ -40,6 +41,10 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
             variant: 'checkbox',
             filterName: 'Status (multi-select)',
             selectionMode: 'multiple',
+            layout: {
+                direction: 'vertical',
+                maxHeight: 220
+            },
             items: [
                 { id: 'active', label: 'Active' },
                 { id: 'paused', label: 'Paused' },
@@ -51,6 +56,9 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
             variant: 'checkbox',
             filterName: 'Owner (single-select)',
             selectionMode: 'single',
+            layout: {
+                direction: 'horizontal'
+            },
             items: [
                 { id: 'self', label: 'My data' },
                 { id: 'shared', label: 'Shared with me' },
@@ -62,6 +70,11 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
             variant: 'chips',
             filterName: 'Regions (multi-select)',
             selectionMode: 'multiple',
+            layout: {
+                direction: 'horizontal',
+                maxHeight: 160,
+                selectedColor: '#0d99ff'
+            },
             items: [
                 { id: 'north', label: 'North' },
                 { id: 'south', label: 'South' },
@@ -74,6 +87,10 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
             variant: 'chips',
             filterName: 'Category (single-select)',
             selectionMode: 'single',
+            layout: {
+                direction: 'vertical',
+                selectedColor: '#f18f01'
+            },
             items: [
                 { id: 'environment', label: 'Environment' },
                 { id: 'transport', label: 'Transport' },
@@ -165,24 +182,12 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
                     <FilterList
                         filters={savedFilters}
                     />
-                    <div className="ms-filter-builder-mock-previews">
-                        {mockFilterConfigs.map((config) => {
-                            const Component = mockVariantComponentMap[config.variant];
-                            if (!Component) {
-                                return null;
-                            }
-                            return (
-                                <Component
-                                    key={config.id}
-                                    filterName={config.filterName}
-                                    items={config.items}
-                                    selectionMode={config.selectionMode}
-                                    selectedValues={mockSelections[config.id] || []}
-                                    onSelectionChange={handleMockSelectionChange(config.id)}
-                                />
-                            );
-                        })}
-                    </div>
+                    <FilterView
+                        configs={mockFilterConfigs}
+                        componentMap={mockVariantComponentMap}
+                        selections={mockSelections}
+                        getSelectionHandler={handleMockSelectionChange}
+                    />
                     <FilterSelector
                         filters={savedFilters}
                         selectedFilterId={selectedFilterId}
