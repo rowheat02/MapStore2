@@ -29,6 +29,8 @@ class VersionInfo extends React.Component {
     };
 
     render() {
+        console.log(this.props.githubUrl, "GITHUB");
+
         return (
             <div key="body" role="body" className="version-panel">
                 <h1 className="title"><Message msgId="version.title"/></h1>
