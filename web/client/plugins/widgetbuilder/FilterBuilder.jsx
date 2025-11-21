@@ -5,7 +5,7 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import BorderLayout from '../../components/layout/BorderLayout';
 import FilterWizard from '../../components/widgets/builder/wizard/FilterWizard';
 import FilterSelector from '../../components/widgets/builder/wizard/filter/FilterSelector';
@@ -35,109 +35,6 @@ const HeaderToolbar = ({ onReset = () => {} }) => (
 );
 
 const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
-    const mockFilterConfigs = useMemo(() => ([
-        {
-            id: 'checkbox-multi',
-            variant: 'checkbox',
-            filterName: 'Status (multi-select)',
-            selectionMode: 'multiple',
-            layout: {
-                direction: 'vertical',
-                maxHeight: 220
-            },
-            items: [
-                { id: 'active', label: 'Active' },
-                { id: 'paused', label: 'Paused' },
-                { id: 'archived', label: 'Archived', disabled: true }
-            ]
-        },
-        {
-            id: 'checkbox-single',
-            variant: 'checkbox',
-            filterName: 'Owner (single-select)',
-            selectionMode: 'single',
-            layout: {
-                direction: 'horizontal'
-            },
-            items: [
-                { id: 'self', label: 'My data' },
-                { id: 'shared', label: 'Shared with me' },
-                { id: 'public', label: 'Public' }
-            ]
-        },
-        {
-            id: 'chips-multi',
-            variant: 'chips',
-            filterName: 'Regions (multi-select)',
-            selectionMode: 'multiple',
-            layout: {
-                direction: 'horizontal',
-                maxHeight: 160,
-                selectedColor: '#0d99ff'
-            },
-            items: [
-                { id: 'north', label: 'North' },
-                { id: 'south', label: 'South' },
-                { id: 'east', label: 'East' },
-                { id: 'west', label: 'West' }
-            ]
-        },
-        {
-            id: 'chips-single',
-            variant: 'chips',
-            filterName: 'Category (single-select)',
-            selectionMode: 'single',
-            layout: {
-                direction: 'vertical',
-                selectedColor: '#f18f01'
-            },
-            items: [
-                { id: 'environment', label: 'Environment' },
-                { id: 'transport', label: 'Transport' },
-                { id: 'utilities', label: 'Utilities' }
-            ]
-        },
-        {
-            id: 'dropdown-multi',
-            variant: 'dropdown',
-            filterName: 'Priority (multi-select)',
-            selectionMode: 'multiple',
-            items: [
-                { id: 'urgent', label: 'Urgent' },
-                { id: 'high', label: 'High' },
-                { id: 'medium', label: 'Medium' },
-                { id: 'low', label: 'Low' }
-            ]
-        },
-        {
-            id: 'dropdown-single',
-            variant: 'dropdown',
-            filterName: 'Timeframe (single-select)',
-            selectionMode: 'single',
-            items: [
-                { id: '24h', label: 'Last 24 hours' },
-                { id: '7d', label: 'Last 7 days' },
-                { id: '30d', label: 'Last 30 days' }
-            ]
-        }
-    ]), []);
-
-    const [mockSelections, setMockSelections] = useState(() =>
-        mockFilterConfigs.reduce((acc, config) => ({
-            ...acc,
-            [config.id]: config.selectionMode === 'single'
-                ? [config.items[0]?.id].filter(Boolean)
-                : config.items.slice(0, 2).map((item) => item.id)
-        }), {})
-    );
-
-    const handleMockSelectionChange = (key) => (nextValues) => {
-        setMockSelections((current) => ({
-            ...current,
-            [key]: nextValues
-        }));
-    };
-
     const mockVariantComponentMap = useMemo(() => ({
         checkbox: FilterCheckboxList,
         chips: FilterChipList,
@@ -150,11 +47,13 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
         savedFilters,
         selectedFilterId,
         data,
+        selections,
         handleChange,
         handleFilterSelect,
         handleAddFilter,
         handleDeleteFilter,
-        handleRenameFilter
+        handleRenameFilter,
+        handleSelectionChange
     } = useFilterManager();
 
     return (
@@ -181,12 +80,9 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
                     </FormGroup>
                     <FilterList
                         filters={savedFilters}
-                    />
-                    <FilterView
-                        configs={mockFilterConfigs}
                         componentMap={mockVariantComponentMap}
-                        selections={mockSelections}
-                        getSelectionHandler={handleMockSelectionChange}
+                        selections={selections}
+                        getSelectionHandler={handleSelectionChange}
                     />
                     <FilterSelector
                         filters={savedFilters}
@@ -196,7 +92,17 @@ const FilterBuilder = ({ enabled, onClose = () => {} } = {}) => {
                         onDelete={handleDeleteFilter}
                         onRename={handleRenameFilter}
                     />
-                    <FilterWizard data={data} onChange={handleChange} />
+                    {data && (
+                        <FilterView
+                            config={data}
+                            componentMap={mockVariantComponentMap}
+                            selections={selections[data.id] || []}
+                            onSelectionChange={handleSelectionChange(data.id)}
+                        />
+                    )}
+                    {data && (
+                        <FilterWizard data={data} onChange={handleChange} />
+                    )}
                 </div>
             ) : null}
         </BorderLayout>

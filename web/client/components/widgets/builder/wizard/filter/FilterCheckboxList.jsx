@@ -7,10 +7,11 @@
  */
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FormGroup, ControlLabel, Checkbox, Radio } from 'react-bootstrap';
+import { FormGroup, ControlLabel, Checkbox, Radio, Glyphicon } from 'react-bootstrap';
 
 const FilterCheckboxList = ({
     filterName,
+    filterIcon,
     items = [],
     selectionMode = 'multiple',
     selectedValues = [],
@@ -48,6 +49,7 @@ const FilterCheckboxList = ({
         <FormGroup className="ms-filter-checkbox-list">
             {filterName ? (
                 <ControlLabel className="ms-filter-checkbox-list-title">
+                    {filterIcon && <Glyphicon glyph={filterIcon} style={{ marginRight: '5px' }} />}
                     {filterName}
                 </ControlLabel>
             ) : null}
@@ -75,6 +77,7 @@ const FilterCheckboxList = ({
 
 FilterCheckboxList.propTypes = {
     filterName: PropTypes.string,
+    filterIcon: PropTypes.string,
     items: PropTypes.arrayOf(PropTypes.shape({
         id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
         label: PropTypes.string.isRequired,

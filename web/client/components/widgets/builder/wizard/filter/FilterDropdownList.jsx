@@ -7,11 +7,12 @@
  */
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
-import { FormGroup, ControlLabel } from 'react-bootstrap';
+import { FormGroup, ControlLabel, Glyphicon } from 'react-bootstrap';
 import Select from 'react-select';
 
 const FilterDropdownList = ({
     filterName,
+    filterIcon,
     items = [],
     selectionMode = 'multiple',
     selectedValues,
@@ -51,6 +52,7 @@ const FilterDropdownList = ({
         <FormGroup className="ms-filter-dropdown-list">
             {filterName ? (
                 <ControlLabel className="ms-filter-dropdown-list-title">
+                    {filterIcon && <Glyphicon glyph={filterIcon} style={{ marginRight: '5px' }} />}
                     {filterName}
                 </ControlLabel>
             ) : null}
@@ -70,6 +72,7 @@ const FilterDropdownList = ({
 
 FilterDropdownList.propTypes = {
     filterName: PropTypes.string,
+    filterIcon: PropTypes.string,
     items: PropTypes.arrayOf(PropTypes.shape({
         id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
         label: PropTypes.string.isRequired,

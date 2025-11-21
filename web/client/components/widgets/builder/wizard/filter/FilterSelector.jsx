@@ -7,8 +7,9 @@
  */
 import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
-import { FormGroup, FormControl, Button, Glyphicon } from 'react-bootstrap';
+import { FormGroup, FormControl, InputGroup, Button, Glyphicon } from 'react-bootstrap';
 import Select from 'react-select';
+import FlexBox from '../../../../layout/FlexBox';
 
 const NEW_FILTER_ID = 'new-filter';
 
@@ -33,9 +34,9 @@ const FilterSelector = ({
             value: NEW_FILTER_ID,
             label: '[New Filter]'
         },
-        ...filters.map((filter, idx) => ({
+        ...filters.map((filter) => ({
             value: filter.id,
-            label: `[Filter ${idx + 1}] ${filter.name || 'Untitled'}`
+            label: `${filter.name || 'Untitled'}`
         }))
     ]), [filters]);
 
@@ -78,29 +79,31 @@ const FilterSelector = ({
 
     return (
         <div className="ms-filter-selector">
-            <FormGroup className="form-group-flex">
-                <div className="ms-filter-selector-row">
-                    <div className="ms-filter-selector-field">
-                        {editMode && selectedFilter
-                            ? (
-                                <FormControl
-                                    type="text"
-                                    value={editValue}
-                                    placeholder="Filter name..."
-                                    onChange={(event) => setEditValue(event.target.value)}
-                                />
-                            )
-                            : (
-                                <Select
-                                    clearable={false}
-                                    value={currentValue}
-                                    options={options}
-                                    onChange={(option) => handleSelect(option?.value)}
-                                />
-                            )
-                        }
-                    </div>
-                    <div className="ms-filter-selector-actions">
+            <FormGroup>
+                <InputGroup>
+                    <FlexBox>
+                        <FlexBox.Fill>
+                            {editMode && selectedFilter
+                                ? (
+                                    <FormControl
+                                        type="text"
+                                        value={editValue}
+                                        placeholder="Filter name..."
+                                        onChange={(event) => setEditValue(event.target.value)}
+                                    />
+                                )
+                                : (
+                                    <Select
+                                        clearable={false}
+                                        value={currentValue}
+                                        options={options}
+                                        onChange={(option) => handleSelect(option?.value)}
+                                    />
+                                )
+                            }
+                        </FlexBox.Fill>
+                    </FlexBox>
+                    <InputGroup.Button>
                         <Button
                             bsStyle="primary"
                             onClick={handleToggleEdit}
@@ -108,12 +111,16 @@ const FilterSelector = ({
                         >
                             <Glyphicon glyph={editMode ? 'ok' : 'pencil'} />
                         </Button>
+                    </InputGroup.Button>
+                    <InputGroup.Button>
                         <Button
                             bsStyle="primary"
                             onClick={handleAdd}
                         >
                             <Glyphicon glyph="plus" />
                         </Button>
+                    </InputGroup.Button>
+                    <InputGroup.Button>
                         <Button
                             bsStyle="primary"
                             onClick={handleDelete}
@@ -121,8 +128,8 @@ const FilterSelector = ({
                         >
                             <Glyphicon glyph="trash" />
                         </Button>
-                    </div>
-                </div>
+                    </InputGroup.Button>
+                </InputGroup>
             </FormGroup>
         </div>
     );

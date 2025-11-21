@@ -7,12 +7,14 @@
  */
 import React from 'react';
 import PropTypes from 'prop-types';
+import { Glyphicon } from 'react-bootstrap';
 import FlexBox from '../../../../layout/FlexBox';
 import Text from '../../../../layout/Text';
 import { getTagColorVariables } from '../../../../../utils/ResourcesFiltersUtils';
 
 const FilterChipList = ({
     filterName,
+    filterIcon,
     items = [],
     selectionMode = 'multiple',
     selectedValues = [],
@@ -71,7 +73,10 @@ const FilterChipList = ({
     return (
         <FlexBox column gap="xs" className="ms-filter-chip-list _padding-sm">
             {filterName ? (
-                <Text fontSize="sm" className="ms-filter-chip-list-title">{filterName}</Text>
+                <FlexBox gap="xs" centerChildrenVertically className="ms-filter-chip-list-title">
+                    {filterIcon && <Glyphicon glyph={filterIcon} />}
+                    <Text fontSize="sm">{filterName}</Text>
+                </FlexBox>
             ) : null}
             <FlexBox
                 component="ul"
@@ -112,6 +117,7 @@ const FilterChipList = ({
 
 FilterChipList.propTypes = {
     filterName: PropTypes.string,
+    filterIcon: PropTypes.string,
     items: PropTypes.arrayOf(PropTypes.shape({
         id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
         label: PropTypes.string.isRequired,

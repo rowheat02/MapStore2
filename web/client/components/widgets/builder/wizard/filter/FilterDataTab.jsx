@@ -71,6 +71,8 @@ const FilterDataTab = ({
     onChange = () => {},
     layerOptions = []
 }) => {
+    const filterData = data?.data || {};
+    
     return (
         <div className="ms-filter-wizard-data-tab">
             <div className="ms-wizard-form-separator">Data</div>
@@ -78,10 +80,10 @@ const FilterDataTab = ({
                 <ControlLabel>Layer</ControlLabel>
                 <InputGroup>
                     <Select
-                        value={data.layer ? layerOptions.find(opt => opt.value === data.layer) : null}
+                        value={filterData.layer ? layerOptions.find(opt => opt.value === filterData.layer) : null}
                         options={layerOptions}
                         placeholder="Select layer..."
-                        onChange={(val) => onChange('layer', val?.value)}
+                        onChange={(val) => onChange('data.layer', val?.value)}
                     />
                 </InputGroup>
             </FormGroup>
@@ -89,10 +91,10 @@ const FilterDataTab = ({
                 <ControlLabel>Type</ControlLabel>
                 <InputGroup>
                     <Select
-                        value={data.type ? TYPE_OPTIONS.find(opt => opt.value === data.type) : null}
+                        value={filterData.type ? TYPE_OPTIONS.find(opt => opt.value === filterData.type) : null}
                         options={TYPE_OPTIONS}
                         placeholder="Select type..."
-                        onChange={(val) => onChange('type', val?.value)}
+                        onChange={(val) => onChange('data.type', val?.value)}
                     />
                 </InputGroup>
             </FormGroup>
@@ -100,10 +102,10 @@ const FilterDataTab = ({
                 <ControlLabel>Categories From</ControlLabel>
                 <InputGroup>
                     <Select
-                        value={data.categoriesFrom ? CATEGORIES_FROM_OPTIONS.find(opt => opt.value === data.categoriesFrom) : null}
+                        value={filterData.categoriesFrom ? CATEGORIES_FROM_OPTIONS.find(opt => opt.value === filterData.categoriesFrom) : null}
                         options={CATEGORIES_FROM_OPTIONS}
                         placeholder="Select categories from..."
-                        onChange={(val) => onChange('categoriesFrom', val?.value)}
+                        onChange={(val) => onChange('data.categoriesFrom', val?.value)}
                     />
                 </InputGroup>
             </FormGroup>
@@ -111,10 +113,10 @@ const FilterDataTab = ({
                 <ControlLabel>Group by</ControlLabel>
                 <InputGroup>
                     <Select
-                        value={data.groupBy ? GROUP_BY_OPTIONS.find(opt => opt.value === data.groupBy) : null}
+                        value={filterData.groupBy ? GROUP_BY_OPTIONS.find(opt => opt.value === filterData.groupBy) : null}
                         options={GROUP_BY_OPTIONS}
                         placeholder="Select group by..."
-                        onChange={(val) => onChange('groupBy', val?.value)}
+                        onChange={(val) => onChange('data.groupBy', val?.value)}
                     />
                 </InputGroup>
             </FormGroup>
@@ -122,10 +124,10 @@ const FilterDataTab = ({
                 <ControlLabel>Sort by</ControlLabel>
                 <InputGroup>
                     <Select
-                        value={data.sortBy ? SORT_BY_OPTIONS.find(opt => opt.value === data.sortBy) : null}
+                        value={filterData.sortBy ? SORT_BY_OPTIONS.find(opt => opt.value === filterData.sortBy) : null}
                         options={SORT_BY_OPTIONS}
                         placeholder="Select sort by..."
-                        onChange={(val) => onChange('sortBy', val?.value)}
+                        onChange={(val) => onChange('data.sortBy', val?.value)}
                     />
                 </InputGroup>
             </FormGroup>

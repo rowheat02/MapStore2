@@ -7,9 +7,13 @@
  */
 import React from 'react';
 import PropTypes from 'prop-types';
+import FilterView from '../../../../../plugins/widgetbuilder/FilterView';
 
 const FilterList = ({
-    filters = []
+    filters = [],
+    componentMap = {},
+    selections = {},
+    getSelectionHandler = () => () => {}
 }) => {
     if (filters.length === 0) {
         return (
@@ -22,21 +26,19 @@ const FilterList = ({
     return (
         <div className="ms-filter-list">
             <div className="ms-filter-list-items">
-                {filters.map((filter, idx) => {
-                    const layerName = filter.data?.layer || 'No layer selected';
-                    const filterType = filter.data?.type || 'Not configured';
+                {filters.map((filter) => {
                     return (
                         <div
                             key={filter.id}
                             className="ms-filter-list-item"
                         >
-                            <div className="ms-filter-list-item-header">
-                                <strong>{`[Filter ${idx + 1}] ${filter.name || 'Untitled'}`}</strong>
-                            </div>
-                            <div className="ms-filter-list-item-details">
-                                <span className="ms-filter-list-item-layer">Layer: {layerName}</span>
-                                <span className="ms-filter-list-item-type">Type: {filterType}</span>
-                            </div>
+
+                            <FilterView
+                                config={filter}
+                                componentMap={componentMap}
+                                selections={selections[filter.id] || []}
+                                onSelectionChange={getSelectionHandler(filter.id)}
+                            />
                         </div>
                     );
                 })}
@@ -50,7 +52,10 @@ FilterList.propTypes = {
         id: PropTypes.string,
         name: PropTypes.string,
         data: PropTypes.object
-    }))
+    })),
+    componentMap: PropTypes.object,
+    selections: PropTypes.object,
+    getSelectionHandler: PropTypes.func
 };
 
 export default FilterList;
