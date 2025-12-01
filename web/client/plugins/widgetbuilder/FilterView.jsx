@@ -7,33 +7,37 @@
  */
 import React from 'react';
 import PropTypes from 'prop-types';
+import { compose } from 'recompose';
+import filterWidgetEnhancer from '../../components/widgets/enhancers/filterWidget';
+import LoadingSpinner from '../../components/misc/LoadingSpinner';
 
 const FilterView = ({
     className,
-    config,
+    filterData,
     componentMap = {},
     selections = [],
-    onSelectionChange = () => {}
+    onSelectionChange = () => {},
+    loading = false
 }) => {
-    if (!config) {
+    if (!filterData) {
         return null;
     }
 
-    const Component = componentMap[config.variant];
+    const Component = componentMap[filterData.variant];
     if (!Component) {
         return null;
     }
 
-    const { layout = {} } = config;
+    const { layout = {} } = filterData;
     const getLayoutProps = () => {
-        if (config.variant === 'chips') {
+        if (filterData.variant === 'chips') {
             return {
                 layoutDirection: layout.direction,
                 layoutMaxHeight: layout.maxHeight,
                 selectedColor: layout.selectedColor
             };
         }
-        if (config.variant === 'checkbox') {
+        if (filterData.variant === 'checkbox') {
             return {
                 layoutDirection: layout.direction,
                 layoutMaxHeight: layout.maxHeight
@@ -43,13 +47,29 @@ const FilterView = ({
     };
 
     return (
-        <div className={['ms-filter-builder-mock-previews', className].filter(Boolean).join(' ')}>
+        <div className={['ms-filter-builder-mock-previews', className].filter(Boolean).join(' ')} style={{ position: 'relative' }}>
+            {loading && (
+                <div style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
+                    zIndex: 10
+                }}>
+                    <LoadingSpinner />
+                </div>
+            )}
             <Component
-                key={config.id}
-                filterName={config.label}
-                filterIcon={config.icon}
-                items={config.items}
-                selectionMode={config.selectionMode}
+                key={filterData.id}
+                filterName={filterData.label}
+                filterIcon={filterData.icon}
+                items={filterData.items}
+                selectionMode={filterData.selectionMode}
                 selectedValues={selections || []}
                 onSelectionChange={onSelectionChange}
                 {...getLayoutProps()}
@@ -60,7 +80,7 @@ const FilterView = ({
 
 FilterView.propTypes = {
     className: PropTypes.string,
-    config: PropTypes.shape({
+    filterData: PropTypes.shape({
         id: PropTypes.string.isRequired,
         variant: PropTypes.string.isRequired,
         label: PropTypes.string,
@@ -75,8 +95,11 @@ FilterView.propTypes = {
     }),
     componentMap: PropTypes.object,
     selections: PropTypes.array,
-    onSelectionChange: PropTypes.func
+    onSelectionChange: PropTypes.func,
+    loading: PropTypes.bool
 };
 
-export default FilterView;
+export default compose(
+    filterWidgetEnhancer
+)(FilterView);
 

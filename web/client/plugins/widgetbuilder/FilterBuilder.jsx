@@ -5,208 +5,91 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import React, { useMemo, useEffect, useCallback } from 'react';
+import React from 'react';
 import { connect } from 'react-redux';
+import { compose, renameProps, branch, renderComponent, withState } from 'recompose';
 import BorderLayout from '../../components/layout/BorderLayout';
-import FilterWizard from '../../components/widgets/builder/wizard/FilterWizard';
-import FilterSelector from '../../components/widgets/builder/wizard/filter/FilterSelector';
-import FilterList from '../../components/widgets/builder/wizard/filter/FilterList';
-import FilterCheckboxList from '../../components/widgets/builder/wizard/filter/FilterCheckboxList';
-import FilterChipList from '../../components/widgets/builder/wizard/filter/FilterChipList';
-import FilterDropdownList from '../../components/widgets/builder/wizard/filter/FilterDropdownList';
 import BuilderHeader from './BuilderHeader';
-import Message from '../../components/I18N/Message';
-import { Button, Glyphicon, FormGroup, ControlLabel, InputGroup, FormControl } from 'react-bootstrap';
-import FilterView from './FilterView';
-import { onEditorChange } from '../../actions/widgets';
-import { wizardSelector, wizardStateToProps } from './commons';
+import Toolbar from '../../components/widgets/builder/wizard/filter/Toolbar';
+import LayerSelector from './FilterLayerSelector';
+import FilterBuilderContent from './FilterBuilderContent';
 import {
-    initialFilters,
-    createDefaultSelections,
-    createNewFilter,
-    updateNestedProperty
-} from './utils/filterBuilderDefaults';
+    insertWidget,
+    onEditorChange,
+    setPage,
+    openFilterEditor,
+    changeEditorSetting
+} from '../../actions/widgets';
+import filterLayerSelector from './enhancers/filterLayerSelector';
+import viewportBuilderConnectMask from './enhancers/connection/viewportBuilderConnectMask';
+import { catalogEditorEnhancer } from './enhancers/catalogEditorEnhancer';
+import { wizardSelector, wizardStateToProps } from './commons';
 
-const HeaderToolbar = ({ onReset = () => {} }) => (
-    <div className="ms-filter-builder-toolbar">
-        <Button
-            className="square-button no-border"
-            bsStyle="primary"
-            onClick={onReset}
-        >
-            <Glyphicon glyph="arrow-left" />
-        </Button>
-        <div className="ms-filter-builder-title">
-            <Message msgId="widgets.types.filter.title" />
-        </div>
-    </div>
-);
-
-const FilterBuilderComponent = ({
-    enabled,
-    onClose = () => {},
-    editorData = {},
-    onEditorChange: onChangeEditor = () => {}
-} = {}) => {
-    const {
-        widgetType,
-        title: widgetTitle,
-        filters = [],
-        selectedFilterId = null,
-        selections = {}
-    } = editorData;
-
-    const mockVariantComponentMap = useMemo(() => ({
-        checkbox: FilterCheckboxList,
-        chips: FilterChipList,
-        dropdown: FilterDropdownList
-    }), []);
-
-    const data = useMemo(
-        () => filters.find(filter => filter.id === selectedFilterId) || null,
-        [filters, selectedFilterId]
-    );
-
-    useEffect(() => {
-        if (!enabled || widgetType !== 'filter') {
-            return;
-        }
-        if (!filters.length) {
-            onChangeEditor('filters', initialFilters);
-            onChangeEditor('selectedFilterId', initialFilters[0]?.id || null);
-        }
-        if (!Object.keys(selections || {}).length) {
-            const sourceFilters = filters.length ? filters : initialFilters;
-            onChangeEditor('selections', createDefaultSelections(sourceFilters));
-        }
-        if (!widgetTitle) {
-            onChangeEditor('title', 'Filter widget');
-        }
-    }, [enabled, widgetType, filters, selections, widgetTitle, onChangeEditor]);
-
-    const handleTitleChange = useCallback((value = '') => {
-        onChangeEditor('title', value);
-    }, [onChangeEditor]);
-
-    const handleFilterSelect = useCallback((filterId) => {
-        onChangeEditor('selectedFilterId', filterId || null);
-    }, [onChangeEditor]);
-
-    const handleAddFilter = useCallback(() => {
-        const nextFilter = createNewFilter(filters.length);
-        const nextFilters = [...filters, nextFilter];
-        onChangeEditor('filters', nextFilters);
-        onChangeEditor('selectedFilterId', nextFilter.id);
-        onChangeEditor('selections', {
-            ...(selections || {}),
-            [nextFilter.id]: []
-        });
-    }, [filters, selections, onChangeEditor]);
-
-    const handleDeleteFilter = useCallback((filterId) => {
-        if (!filterId) {
-            return;
-        }
-        const nextFilters = filters.filter(filter => filter.id !== filterId);
-        onChangeEditor('filters', nextFilters);
-        if (selections && selections[filterId]) {
-            const nextSelections = { ...selections };
-            delete nextSelections[filterId];
-            onChangeEditor('selections', nextSelections);
-        }
-        if (selectedFilterId === filterId) {
-            onChangeEditor('selectedFilterId', nextFilters[0]?.id || null);
-        }
-    }, [filters, selections, selectedFilterId, onChangeEditor]);
-
-    const handleRenameFilter = useCallback((filterId, name) => {
-        const label = name?.trim() || 'Untitled';
-        const nextFilters = filters.map(filter => filter.id === filterId
-            ? { ...filter, name: label, label }
-            : filter);
-        onChangeEditor('filters', nextFilters);
-        if (data && data.id === filterId) {
-            handleFilterSelect(filterId);
-        }
-    }, [filters, data, handleFilterSelect, onChangeEditor]);
-
-    const handleChange = useCallback((key, value) => {
-        if (!data) {
-            return;
-        }
-        const nextFilter = key.includes('.')
-            ? updateNestedProperty({ ...data }, key, value)
-            : { ...data, [key]: value };
-        const nextFilters = filters.map(filter =>
-            filter.id === data.id ? nextFilter : filter
-        );
-        onChangeEditor('filters', nextFilters);
-    }, [data, filters, onChangeEditor]);
-
-    const handleSelectionChange = useCallback((filterId) => (nextValues = []) => {
-        onChangeEditor('selections', {
-            ...(selections || {}),
-            [filterId]: nextValues
-        });
-    }, [selections, onChangeEditor]);
-
-    return (
-        <BorderLayout
-            className="bg-body"
-            header={
-                <BuilderHeader onClose={onClose}>
-                    <HeaderToolbar onReset={onClose} />
-                </BuilderHeader>
-            }
-        >
-            {enabled ? (
-                <div className="ms-filter-builder-content">
-                    <FormGroup className="form-group-flex">
-                        <ControlLabel>Title</ControlLabel>
-                        <InputGroup>
-                            <FormControl
-                                value={widgetTitle || ''}
-                                type="text"
-                                placeholder="Enter widget title..."
-                                onChange={(e) => handleTitleChange(e.target.value)}
-                            />
-                        </InputGroup>
-                    </FormGroup>
-                    <FilterList
-                        filters={filters}
-                        componentMap={mockVariantComponentMap}
-                        selections={selections}
-                        getSelectionHandler={handleSelectionChange}
-                    />
-                    <FilterSelector
-                        filters={filters}
-                        selectedFilterId={selectedFilterId}
-                        onSelect={handleFilterSelect}
-                        onAdd={handleAddFilter}
-                        onDelete={handleDeleteFilter}
-                        onRename={handleRenameFilter}
-                    />
-                    {data && (
-                        <FilterView
-                            config={data}
-                            componentMap={mockVariantComponentMap}
-                            selections={selections[data.id] || []}
-                            onSelectionChange={handleSelectionChange(data.id)}
-                        />
-                    )}
-                    {data && (
-                        <FilterWizard data={data} onChange={handleChange} />
-                    )}
-                </div>
-            ) : null}
-        </BorderLayout>
-    );
-};
-
-export default connect(
+const Builder = connect(
     wizardSelector,
     {
-        onEditorChange
+        setPage,
+        setValid: valid => changeEditorSetting("valid", valid),
+        onEditorChange,
+        insertWidget,
+        openFilterEditor
     },
     wizardStateToProps
-)(FilterBuilderComponent);
+)(compose(
+    renameProps({
+        editorData: "data",
+        onEditorChange: "onChange"
+    })
+)(FilterBuilderContent));
+
+const FilterToolbar = compose(
+    connect(
+        wizardSelector,
+        {
+            setPage,
+            onChange: onEditorChange,
+            insertWidget
+        },
+        wizardStateToProps
+    )
+)(Toolbar);
+
+/*
+ * in case you don't have a layer selected (e.g. dashboard) the filter builder
+ * prompts a catalog view to allow layer selection
+ */
+const chooseLayerEnhancer = compose(
+    withState('showLayers', "toggleLayerSelector", false),
+    withState('errors', 'setErrors', {}),
+    connect(wizardSelector, null, wizardStateToProps),
+    viewportBuilderConnectMask,
+    catalogEditorEnhancer,
+    branch(
+        ({showLayers} = {}) => showLayers,
+        renderComponent(filterLayerSelector(LayerSelector))
+    )
+);
+
+export default chooseLayerEnhancer(({ enabled, onClose = () => {}, exitButton, editorData, ...props } = {}) => {
+    return (
+        <div className="mapstore-filter-advance-options">
+            <BorderLayout
+                header={
+                    <BuilderHeader onClose={onClose}>
+                        <FilterToolbar
+                            exitButton={exitButton}
+                            editorData={editorData}
+                            onClose={onClose}
+                            toggleLayerSelector={props.toggleLayerSelector}
+                            errors={props.errors}
+                            dashboardEditing={props.dashboardEditing}
+                            widgets={props.widgets}
+                        />
+                    </BuilderHeader>
+                }
+            >
+                {enabled ? <Builder {...props} enabled={enabled} toggleLayerSelector={props.toggleLayerSelector} /> : null}
+            </BorderLayout>
+        </div>
+    );
+});

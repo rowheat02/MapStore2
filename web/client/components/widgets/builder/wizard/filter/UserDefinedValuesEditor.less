@@ -1,0 +1,316 @@
+//
+// Copyright 2025, GeoSolutions Sas.
+// All rights reserved.
+//
+// This source code is licensed under the BSD-style license found in the
+// LICENSE file in the root directory of this source tree.
+//
+
+.ms-filter-user-defined {
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+
+    .control-label {
+        margin-bottom: 8px;
+        font-weight: 500;
+        font-size: 13px;
+    }
+
+    // Input Row
+    .ms-filter-user-defined-input-row {
+        display: flex;
+        flex-wrap: nowrap;
+        gap: 8px;
+        align-items: flex-end;
+        margin-bottom: 12px;
+        padding: 10px;
+        background-color: #f9f9f9;
+        border: 1px solid #e3e3e3;
+        border-radius: 4px;
+    }
+
+    .ms-filter-user-defined-input-group {
+        display: flex;
+        flex-direction: column;
+        flex: 1 1 0;
+        min-width: 0;
+        gap: 4px;
+
+        .ms-filter-user-defined-input-label {
+            font-size: 11px;
+            font-weight: 500;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .form-control {
+            width: 100%;
+            height: 28px;
+            padding: 4px 8px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+            transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+
+            &:focus {
+                border-color: #66afe9;
+                outline: 0;
+                box-shadow: inset 0 1px 1px rgba(0, 0, 0, 0.075), 0 0 6px rgba(102, 175, 233, 0.5);
+            }
+
+            &::placeholder {
+                color: #999;
+            }
+        }
+    }
+
+    .ms-filter-user-defined-input-actions {
+        display: flex;
+        gap: 6px;
+        flex: 0 0 auto;
+        align-items: center;
+        flex-shrink: 0;
+        white-space: nowrap;
+
+        .btn {
+            min-width: 80px;
+            height: 28px;
+            padding: 4px 10px;
+            font-size: 12px;
+            white-space: nowrap;
+
+            &:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        }
+
+        .ms-filter-user-defined-cancel-btn {
+            min-width: 65px;
+        }
+    }
+
+    // Saved Items List
+    .ms-filter-user-defined-list {
+        display: block;
+        width: 100%;
+        margin-top: 0;
+        border: 1px solid #e3e3e3;
+        border-radius: 4px;
+        overflow: hidden;
+        background-color: #fff;
+    }
+
+    .ms-filter-user-defined-list-header {
+        display: flex;
+        align-items: center;
+        padding: 8px 10px;
+        background-color: #f5f5f5;
+        border-bottom: 1px solid #e3e3e3;
+        font-weight: 600;
+        font-size: 11px;
+        color: #333;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+
+        > span {
+            flex: 1 1 auto;
+            min-width: 0;
+
+            &.ms-filter-user-defined-label-col {
+                flex: 1.2 1 0;
+            }
+
+            &.ms-filter-user-defined-value-col {
+                flex: 1 1 0;
+            }
+
+            &.ms-filter-user-defined-filter-col {
+                flex: 1.5 1 0;
+            }
+
+            &.ms-filter-user-defined-actions {
+                flex: 0 0 140px;
+                text-align: center;
+            }
+        }
+    }
+
+    .ms-filter-user-defined-list-item {
+        display: flex;
+        align-items: center;
+        padding: 8px 10px;
+        border-bottom: 1px solid #e3e3e3;
+        transition: background-color 0.15s ease-in-out;
+
+        &:last-child {
+            border-bottom: none;
+        }
+
+        &:hover {
+            background-color: #f9f9f9;
+        }
+
+        > span {
+            flex: 1 1 auto;
+            min-width: 0;
+            font-size: 12px;
+            color: #333;
+            padding-right: 8px;
+        }
+
+        .ms-filter-user-defined-item-label {
+            flex: 1.2 1 0;
+            font-weight: 500;
+        }
+
+        .ms-filter-user-defined-item-value {
+            flex: 1 1 0;
+            color: #666;
+        }
+
+        .ms-filter-user-defined-item-filter {
+            flex: 1.5 1 0;
+            color: #555;
+            font-style: italic;
+            word-break: break-word;
+        }
+    }
+
+    .ms-filter-user-defined-item-actions {
+        display: flex;
+        gap: 3px;
+        flex: 0 0 100px;
+        justify-content: center;
+        align-items: center;
+
+        .btn {
+            padding: 3px 6px;
+            min-width: 28px;
+            height: 24px;
+            border: none;
+            background: transparent;
+            color: #666;
+            transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out;
+
+            &:hover,
+            &:focus {
+                color: #333;
+                background-color: #e8e8e8;
+            }
+
+            .glyphicon {
+                font-size: 12px;
+            }
+        }
+    }
+
+    // Responsive adjustments
+    @media (max-width: 768px) {
+        .ms-filter-user-defined-input-row {
+            flex-wrap: wrap;
+
+            .ms-filter-user-defined-input-group {
+                flex: 1 1 100%;
+                min-width: 100%;
+            }
+
+            .ms-filter-user-defined-input-actions {
+                flex: 1 1 100%;
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+
+        .ms-filter-user-defined-list-header,
+        .ms-filter-user-defined-list-item {
+            flex-wrap: wrap;
+
+            > span {
+                flex: 1 1 100% !important;
+                margin-bottom: 6px;
+
+                &.ms-filter-user-defined-actions {
+                    flex: 1 1 100% !important;
+                }
+            }
+        }
+
+        .ms-filter-user-defined-item-actions {
+            width: 100%;
+            justify-content: flex-end;
+        }
+    }
+}
+
+// Theme variables support
+#ms-components-theme(@theme-vars) {
+    .ms-filter-user-defined {
+        .ms-filter-user-defined-input-row {
+            .background-color-var(@theme-vars[main-variant-bg]);
+            .border-color-var(@theme-vars[main-border-color]);
+        }
+
+        .ms-filter-user-defined-list {
+            .border-color-var(@theme-vars[main-border-color]);
+            .background-color-var(@theme-vars[main-bg]);
+        }
+
+        .ms-filter-user-defined-list-header {
+            .background-color-var(@theme-vars[main-variant-bg]);
+            .border-bottom-color-var(@theme-vars[main-border-color]);
+            .color-var(@theme-vars[main-color]);
+        }
+
+        .ms-filter-user-defined-list-item {
+            .border-bottom-color-var(@theme-vars[main-border-color]);
+
+            &:hover {
+                .background-color-var(@theme-vars[main-variant-bg]);
+            }
+
+            > span {
+                .color-var(@theme-vars[main-color]);
+
+                &:nth-child(2) {
+                    .color-var(@theme-vars[main-variant-color]);
+                }
+            }
+        }
+
+        .ms-filter-user-defined-input-group {
+            .ms-filter-user-defined-input-label {
+                .color-var(@theme-vars[main-variant-color]);
+            }
+
+            .form-control {
+                .border-color-var(@theme-vars[main-border-color]);
+                .background-color-var(@theme-vars[main-bg]);
+                .color-var(@theme-vars[main-color]);
+
+                &:focus {
+                    .border-color-var(@theme-vars[focus-color]);
+                }
+            }
+        }
+
+        .ms-filter-user-defined-item-actions {
+            .btn {
+                .color-var(@theme-vars[main-variant-color]);
+
+                &:hover,
+                &:focus {
+                    .color-var(@theme-vars[main-color]);
+                    .background-color-var(@theme-vars[main-variant-bg]);
+                }
+            }
+        }
+    }
+}
+
+.ms-filter-user-defined-label {
+    margin-left: 8px;
+    font-size: 13px;
+}

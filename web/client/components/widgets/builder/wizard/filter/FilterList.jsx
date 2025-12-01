@@ -13,7 +13,8 @@ const FilterList = ({
     filters = [],
     componentMap = {},
     selections = {},
-    getSelectionHandler = () => () => {}
+    getSelectionHandler = () => () => {},
+    selectedFilterId
 }) => {
     if (filters.length === 0) {
         return (
@@ -26,7 +27,8 @@ const FilterList = ({
     return (
         <div className="ms-filter-list">
             <div className="ms-filter-list-items">
-                {filters.map((filter) => {
+                {/* For now selected filter is displayed in the list */}
+                {filters.filter(filter => filter.id === selectedFilterId).map((filter) => {
                     return (
                         <div
                             key={filter.id}
@@ -34,7 +36,7 @@ const FilterList = ({
                         >
 
                             <FilterView
-                                config={filter}
+                                filterData={filter}
                                 componentMap={componentMap}
                                 selections={selections[filter.id] || []}
                                 onSelectionChange={getSelectionHandler(filter.id)}

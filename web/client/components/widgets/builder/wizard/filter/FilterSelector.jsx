@@ -30,10 +30,6 @@ const FilterSelector = ({
     );
 
     const options = useMemo(() => ([
-        {
-            value: NEW_FILTER_ID,
-            label: '[New Filter]'
-        },
         ...filters.map((filter) => ({
             value: filter.id,
             label: `${filter.name || 'Untitled'}`

@@ -6,25 +6,28 @@
  * LICENSE file in the root directory of this source tree.
  */
 import React, { useState } from 'react';
-import { Nav, NavItem } from 'react-bootstrap';
+import { Nav, NavItem, Button, Glyphicon } from 'react-bootstrap';
 import FilterDataTab from './filter/FilterDataTab';
 import FilterLayoutTab from './filter/FilterLayoutTab';
 import FilterActionsTab from './filter/FilterActionsTab';
 
+
 const FilterWizard = ({
     data = {},
-    onChange = () => {}
+    onChange = () => {},
+    onOpenLayerSelector = () => {},
+    openFilterEditor = () => {}
 }) => {
     const [activeTab, setActiveTab] = useState('data');
 
     const tabs = [
         { id: 'data', glyph: 'th-list', label: "Data" },
         { id: 'layout', glyph: 'cog', label: "Layout" },
-        { id: 'actions', glyph: 'flash', label: "Actions" }
+        { id: 'actions', glyph: 'flash', label: "Interactions" }
     ];
 
     const tabContents = {
-        data: <FilterDataTab data={data} onChange={onChange} />,
+        data: <FilterDataTab data={data} onChange={onChange} onOpenLayerSelector={onOpenLayerSelector} openFilterEditor={openFilterEditor} />,
         layout: <FilterLayoutTab data={data} onChange={onChange} />,
         actions: <FilterActionsTab data={data} onChange={onChange} />
     };
@@ -43,6 +46,13 @@ const FilterWizard = ({
                         </NavItem>
                     ))}
                 </Nav>
+                {/* <Button
+                    bsStyle={data?.filter ? 'success' : 'primary'}
+                    onClick={() => openFilterEditor()}
+                    tooltipId={'widgets.builder.filterLayer'}
+                >
+                    <Glyphicon glyph="filter" />
+                </Button> */}
                 <div className="ms-filter-tab-content">
                     {tabContents[activeTab]}
                 </div>

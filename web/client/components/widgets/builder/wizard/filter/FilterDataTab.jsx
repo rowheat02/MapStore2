@@ -5,45 +5,48 @@
  * This source code is licensed under the BSD-style license found in the
  * LICENSE file in the root directory of this source tree.
  */
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { connect } from 'react-redux';
 import { createSelector } from 'reselect';
-import { FormGroup, ControlLabel, InputGroup } from 'react-bootstrap';
+import { FormGroup, ControlLabel, InputGroup, FormControl, Button, ButtonGroup, Glyphicon } from 'react-bootstrap';
 import Select from 'react-select';
 import { layersSelector } from '../../../../../selectors/layers';
 import { currentLocaleSelector } from '../../../../../selectors/locale';
 import { getLayerTitle } from '../../../../../utils/LayersUtils';
+import InfoPopover from '../../../widget/InfoPopover';
+// import UserDefinedValuesEditor from './UserDefinedValuesEditor'; // Kept for backup
+import UserDefinedValuesDataGrid from './UserDefinedValuesDataGrid';
+// import { getDefaultLayer } from '../../../../../plugins/widgetbuilder/utils/filterBuilderDefaults';
+import { describeFeatureType } from '../../../../../observables/wfs';
+import { describeFeatureTypeToAttributes } from '../../../../../utils/FeatureTypeUtils';
+import sortByAttributesIcon from '../../../../../themes/default/svg/sort-by-attributes.svg';
+import sortByAttributesAltIcon from '../../../../../themes/default/svg/sort-by-attributes-alt.svg';
+import tooltip from '../../../../misc/enhancers/tooltip';
+import ButtonWithTooltip from '../../../../misc/Button';
 
-const TYPE_OPTIONS = [
-    { value: 'category', label: 'Category' },
-    { value: 'range', label: 'Range' },
-    { value: 'date', label: 'Date' },
-    { value: 'text', label: 'Text' },
-    { value: 'number', label: 'Number' }
+const TButtonWithTooltip = tooltip(({ children, active, ...props }) => (
+    <ButtonWithTooltip
+        {...props}
+        bsStyle={active ? 'primary' : 'default'}
+        className="square-button-md"
+    >
+        {children}
+    </ButtonWithTooltip>
+));
+
+const DATA_SOURCE_OPTIONS = [
+    { value: 'features', label: 'Features' },
+    { value: 'userDefined', label: 'User defined' }
 ];
 
-const CATEGORIES_FROM_OPTIONS = [
-    { value: 'grouped_values', label: 'Grouped values' },
-    { value: 'attribute_values', label: 'Attribute values' },
-    { value: 'distinct_values', label: 'Distinct values' },
-    { value: 'custom_list', label: 'Custom list' }
+const VALUES_FROM_OPTIONS = [
+    { value: 'grouped', label: 'Unique Attribute ', description: 'Invoke distinct WPS on the layer attribute.' },
+    { value: 'single', label: 'Attributes', description: 'Query WFS once per attribute value.' }
 ];
 
-const GROUP_BY_OPTIONS = [
-    { value: 'sub_region', label: 'SUB_REGION' },
-    { value: 'year', label: 'YEAR' },
-    { value: 'category', label: 'CATEGORY' },
-    { value: 'type', label: 'TYPE' },
-    { value: 'status', label: 'STATUS' }
-];
-
-const SORT_BY_OPTIONS = [
-    { value: 'sub_region', label: 'SUB_REGION' },
-    { value: 'year', label: 'YEAR' },
-    { value: 'category', label: 'CATEGORY' },
-    { value: 'name', label: 'NAME' },
-    { value: 'value', label: 'VALUE' },
-    { value: 'date', label: 'DATE' }
+const FILTER_COMPOSITION_OPTIONS = [
+    { value: 'AND', label: 'Match all filters (AND)' },
+    { value: 'OR', label: 'Match any filter (OR)' }
 ];
 
 const availableLayersSelector = createSelector(
@@ -51,17 +54,11 @@ const availableLayersSelector = createSelector(
     currentLocaleSelector,
     (layers, locale) => {
         return layers
-            .filter(layer => {
-                // Filter layers similar to availableSnappingLayers pattern
-                const isWFSOrVector = ['wfs', 'vector'].includes(layer?.type);
-                const isWMSWithWFS = layer?.type === 'wms' && layer?.search?.type === 'wfs';
-                const isNotBackground = layer.group !== 'background';
-                const isVisible = layer.visibility;
-                return (isWFSOrVector || isWMSWithWFS) && isNotBackground && isVisible;
-            })
             .map(layer => ({
                 value: layer.id,
-                label: getLayerTitle(layer, locale) || layer.name || layer.id
+                label: getLayerTitle(layer, locale) || layer.name || layer.id,
+                fields: layer.fields || [],
+                originalLayer: layer
             }));
     }
 );
@@ -69,76 +66,409 @@ const availableLayersSelector = createSelector(
 const FilterDataTab = ({
     data = {},
     onChange = () => {},
-    layerOptions = []
+    layerOptions = [],
+    layerAttributes = {},
+    layerSources = {},
+    onOpenLayerSelector = () => {},
+    openFilterEditor
 }) => {
+    const [remoteAttributes, setRemoteAttributes] = useState({ key: null, options: [] });
+    const [attributesLoading, setAttributesLoading] = useState(false);
+    const [attributesError, setAttributesError] = useState(null);
     const filterData = data?.data || {};
-    
+    const dataSource = filterData.dataSource
+        ?? (filterData.type === 'userDefined' ? 'userDefined' : 'features');
+    const valuesFrom = filterData.valuesFrom
+        ?? (filterData.type === 'grouped' ? 'grouped' : 'single');
+    const isUserDefined = dataSource === 'userDefined';
+    const isFeaturesSource = dataSource === 'features';
+    const layerIsRequired = !!dataSource;
+    const filterComposition = filterData.filterComposition || 'AND';
+    const legacyValueAttribute = filterData.groupBy;
+    const valueAttribute = filterData.valueAttribute ?? legacyValueAttribute ?? null;
+    const labelAttribute = filterData.labelAttribute ?? null;
+    const sortByAttribute = filterData.sortByAttribute ?? null;
+    const sortOrder = filterData.sortOrder || 'ASC';
+    const maxFeaturesValue = Number.isFinite(filterData.maxFeatures) ? filterData.maxFeatures : '';
+    const selectedLayerId = typeof filterData.layer === 'string'
+        ? filterData.layer
+        : filterData.layer?.id || filterData.layer?.name;
+    const selectedLayerOption = selectedLayerId ? layerOptions.find(opt => opt.value === selectedLayerId) : null;
+    const selectedLayerObject = typeof filterData.layer === 'object'
+        ? filterData.layer
+        : (selectedLayerId ? layerSources?.[selectedLayerId] : null);
+    const staticAttributeOptions = selectedLayerId ? (layerAttributes?.[selectedLayerId] || []) : [];
+    const localFieldOptions = useMemo(() => (
+        (selectedLayerObject?.fields || [])
+            .filter(({ name }) => !!name)
+            .map(field => ({
+                value: field.name,
+                label: field.alias || field.name
+            }))
+    ), [selectedLayerObject]);
+    const selectedLayerKey = selectedLayerObject?.id || selectedLayerObject?.name || selectedLayerId;
+    const remoteAttributeOptions = selectedLayerKey && remoteAttributes.key === selectedLayerKey
+        ? remoteAttributes.options
+        : [];
+    const attributeOptions = useMemo(() => {
+        if (staticAttributeOptions.length) {
+            return staticAttributeOptions;
+        }
+        if (localFieldOptions.length) {
+            return localFieldOptions;
+        }
+        return remoteAttributeOptions;
+    }, [staticAttributeOptions, localFieldOptions, remoteAttributeOptions]);
+    const hasLayerSelection = !!selectedLayerObject;
+    const userDefinedItems = useMemo(() => (
+        (filterData.userDefinedItems || []).map(item => {
+            const filterEntry = typeof item?.filter === 'string'
+                ? { expression: item.filter }
+                : (item?.filter || null);
+            return {
+                id: item?.id,
+                label: item?.label || '',
+                value: item?.value || '',
+                filter: filterEntry
+            };
+        })
+    ), [filterData.userDefinedItems]);
+
+    const handleDataSourceChange = (option) => {
+        const nextSource = option?.value || 'features';
+        onChange('data.dataSource', nextSource);
+        // if (nextSource === 'userDefined') {
+        //     onChange('data.valuesFrom', 'single');
+        // } else if (dataSource === 'userDefined') {
+        //     onChange('data.valuesFrom', 'grouped');
+        // }
+    };
+
+    const handleValuesFromChange = (option) => {
+        const nextValue = option?.value || 'grouped';
+        onChange('data.valuesFrom', nextValue);
+        if (nextValue === 'grouped') {
+            onChange('data.labelAttribute', undefined);
+            // Don't clear maxFeatures - it's needed for grouped mode too
+        }
+    };
+
+    const handleUserDefinedItemsChange = (items) => {
+        onChange('data.userDefinedItems', items);
+    };
+
+    const handleValueAttributeChange = (option) => {
+        onChange('data.valueAttribute', option?.value);
+    };
+
+    const handleLabelAttributeChange = (option) => {
+        onChange('data.labelAttribute', option?.value);
+    };
+
+    const handleSortByAttributeChange = (option) => {
+        onChange('data.sortByAttribute', option?.value);
+    };
+
+    const handleSortOrderChange = (order) => {
+        onChange('data.sortOrder', order);
+    };
+
+    const handleMaxFeaturesChange = (event) => {
+        const nextValue = parseInt(event?.target?.value, 10);
+        onChange('data.maxFeatures', Number.isNaN(nextValue) ? undefined : nextValue);
+    };
+
+    const handleFilterCompositionChange = (option) => {
+        onChange('data.filterComposition', option?.value || 'AND');
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+        const hasStaticAttributes = staticAttributeOptions.length > 0;
+        const hasLocalAttributes = localFieldOptions.length > 0;
+
+        if (!selectedLayerKey || !hasLayerSelection) {
+            setAttributesLoading(false);
+            setAttributesError(null);
+            setRemoteAttributes({ key: null, options: [] });
+            return () => {};
+        }
+
+        if (hasStaticAttributes || hasLocalAttributes) {
+            setAttributesLoading(false);
+            setAttributesError(null);
+            setRemoteAttributes({ key: null, options: [] });
+            return () => {};
+        }
+
+        if (!selectedLayerObject?.name) {
+            setAttributesLoading(false);
+            setAttributesError('Selected layer is missing a valid name');
+            setRemoteAttributes({ key: null, options: [] });
+            return () => {};
+        }
+
+        setAttributesLoading(true);
+        setAttributesError(null);
+        setRemoteAttributes({ key: null, options: [] });
+
+        const subscription = describeFeatureType({ layer: selectedLayerObject }).subscribe(
+            (response = {}) => {
+                if (cancelled) {
+                    return;
+                }
+                const attributes = describeFeatureTypeToAttributes(response?.data, selectedLayerObject?.fields || []);
+                const options = attributes.map(attribute => ({
+                    value: attribute.attribute,
+                    label: attribute.label
+                }));
+                setRemoteAttributes({
+                    key: selectedLayerKey,
+                    options
+                });
+                setAttributesLoading(false);
+            },
+            (error = {}) => {
+                if (cancelled) {
+                    return;
+                }
+                setRemoteAttributes({ key: null, options: [] });
+                setAttributesLoading(false);
+                setAttributesError(error?.message || 'Unable to load attributes');
+            }
+        );
+
+        return () => {
+            cancelled = true;
+            if (subscription && subscription.unsubscribe) {
+                subscription.unsubscribe();
+            }
+        };
+    }, [selectedLayerKey, hasLayerSelection, staticAttributeOptions.length, localFieldOptions.length]);
+
+    const attributeNoResultsText = hasLayerSelection
+        ? (attributesError || 'No attributes available')
+        : 'Select a layer first';
+
     return (
         <div className="ms-filter-wizard-data-tab">
-            <div className="ms-wizard-form-separator">Data</div>
             <FormGroup className="form-group-flex">
+                <ControlLabel>Data source</ControlLabel>
+                <InputGroup>
+                    <Select
+                        value={DATA_SOURCE_OPTIONS.find(opt => opt.value === dataSource)}
+                        options={DATA_SOURCE_OPTIONS}
+                        placeholder="Select data source..."
+                        onChange={handleDataSourceChange}
+                    />
+                </InputGroup>
+            </FormGroup>
+            {isUserDefined && <>
+                <FormGroup className="form-group-flex">
+                    <ControlLabel>Type</ControlLabel>
+                    <InputGroup>
+                        <FormControl
+                            type="text"
+                            value="Filter list"
+                            readOnly
+                        />
+                    </InputGroup>
+                </FormGroup>
+            </>}
+
+            <FormGroup
+                className="form-group-flex"
+                validationState={layerIsRequired && !filterData.layer ? 'error' : null}
+            >
                 <ControlLabel>Layer</ControlLabel>
                 <InputGroup>
-                    <Select
-                        value={filterData.layer ? layerOptions.find(opt => opt.value === filterData.layer) : null}
-                        options={layerOptions}
-                        placeholder="Select layer..."
-                        onChange={(val) => onChange('data.layer', val?.value)}
+                    <FormControl
+                        type="text"
+                        value={selectedLayerOption?.label || (typeof filterData.layer === 'object' ? (filterData.layer?.title || filterData.layer?.name) : '')}
+                        placeholder="Select a data source..."
+                        readOnly
+                        onClick={() => onOpenLayerSelector()}
+                        style={{ cursor: 'pointer' }}
                     />
+                    <InputGroup.Button>
+                        <Button
+                            onClick={() => onOpenLayerSelector()}
+                        >
+                            <Glyphicon glyph="folder-open" />
+                        </Button>
+                    </InputGroup.Button>
+                    <InputGroup.Button>
+                        <Button
+                            // bsStyle={data?.filter ? 'success' : 'primary'}
+                            onClick={() => openFilterEditor()}
+                            tooltipId={'widgets.builder.filterLayer'}
+                        >
+                            <Glyphicon glyph="filter" />
+                        </Button>
+                    </InputGroup.Button>
                 </InputGroup>
             </FormGroup>
-            <FormGroup className="form-group-flex">
-                <ControlLabel>Type</ControlLabel>
-                <InputGroup>
-                    <Select
-                        value={filterData.type ? TYPE_OPTIONS.find(opt => opt.value === filterData.type) : null}
-                        options={TYPE_OPTIONS}
-                        placeholder="Select type..."
-                        onChange={(val) => onChange('data.type', val?.value)}
+
+            {isFeaturesSource && (
+                <>
+                    <FormGroup className="form-group-flex">
+                        <ControlLabel>
+                            Values from{' '}
+                            <InfoPopover
+                                id="ms-filter-values-from-help"
+                                placement="right"
+                                trigger={['hover', 'focus']}
+                                text={
+                                    <div className="ms-filter-type-help-popover">
+                                        {VALUES_FROM_OPTIONS.map(option => (
+                                            <div key={option.value} className="ms-filter-type-help-entry">
+                                                <strong>{option.label}:</strong> {option.description}
+                                            </div>
+                                        ))}
+                                    </div>
+                                }
+                            />
+                        </ControlLabel>
+                        <InputGroup>
+                            <Select
+                                value={VALUES_FROM_OPTIONS.find(opt => opt.value === valuesFrom)}
+                                options={VALUES_FROM_OPTIONS}
+                                placeholder="Select source..."
+                                onChange={handleValuesFromChange}
+                            />
+                        </InputGroup>
+                    </FormGroup>
+
+                    <FormGroup className="form-group-flex">
+                        <ControlLabel>Value attribute</ControlLabel>
+                        <InputGroup>
+                            <Select
+                                value={valueAttribute ? attributeOptions.find(opt => opt.value === valueAttribute) : null}
+                                options={attributeOptions}
+                                placeholder="Select attribute..."
+                                onChange={handleValueAttributeChange}
+                                disabled={!attributeOptions.length && !attributesLoading}
+                                isLoading={attributesLoading && !attributeOptions.length}
+                                noResultsText={attributeNoResultsText}
+                            />
+                        </InputGroup>
+                    </FormGroup>
+
+                    {valuesFrom === 'single' && (
+                        <FormGroup className="form-group-flex">
+                            <ControlLabel>Label attribute</ControlLabel>
+                            <InputGroup>
+                                <Select
+                                    value={labelAttribute ? attributeOptions.find(opt => opt.value === labelAttribute) : null}
+                                    options={attributeOptions}
+                                    placeholder="Select attribute..."
+                                    onChange={handleLabelAttributeChange}
+                                    disabled={!attributeOptions.length && !attributesLoading}
+                                    isLoading={attributesLoading && !attributeOptions.length}
+                                    noResultsText={attributeNoResultsText}
+                                />
+                            </InputGroup>
+                        </FormGroup>
+                    )}
+
+                    <FormGroup className="form-group-flex">
+                        <ControlLabel>Sort by attribute</ControlLabel>
+                        <InputGroup>
+                            <Select
+                                value={sortByAttribute ? attributeOptions.find(opt => opt.value === sortByAttribute) : null}
+                                options={attributeOptions}
+                                placeholder="Select attribute..."
+                                onChange={handleSortByAttributeChange}
+                                disabled={!attributeOptions.length && !attributesLoading}
+                                isLoading={attributesLoading && !attributeOptions.length}
+                                noResultsText={attributeNoResultsText}
+                            />
+                            <InputGroup.Button>
+                                <ButtonGroup style={{ display: 'flex', flexDirection: 'row' }}>
+                                    <TButtonWithTooltip
+                                        id="sort-asc"
+                                        active={sortOrder === 'ASC'}
+                                        onClick={() => handleSortOrderChange('ASC')}
+                                        tooltip="Ascending (ASC)"
+                                    >
+                                        <img src={sortByAttributesIcon} alt="ASC" style={{ width: '16px', height: '16px' }} />
+                                    </TButtonWithTooltip>
+                                    <TButtonWithTooltip
+                                        id="sort-desc"
+                                        active={sortOrder === 'DESC'}
+                                        onClick={() => handleSortOrderChange('DESC')}
+                                        tooltip="Descending (DESC)"
+                                    >
+                                        <img src={sortByAttributesAltIcon} alt="DESC" style={{ width: '16px', height: '16px' }} />
+                                    </TButtonWithTooltip>
+                                </ButtonGroup>
+                            </InputGroup.Button>
+                        </InputGroup>
+                    </FormGroup>
+
+                    <FormGroup className="form-group-flex">
+                        <ControlLabel>Max features</ControlLabel>
+                        <InputGroup>
+                            <FormControl
+                                type="number"
+                                min={1}
+                                placeholder="Enter max features..."
+                                value={maxFeaturesValue === '' ? '' : `${maxFeaturesValue}`}
+                                onChange={handleMaxFeaturesChange}
+                            />
+                        </InputGroup>
+                    </FormGroup>
+                </>
+            )}
+
+            {isUserDefined && (
+                <>
+
+                    <UserDefinedValuesDataGrid
+                        items={userDefinedItems}
+                        onChange={handleUserDefinedItemsChange}
                     />
-                </InputGroup>
-            </FormGroup>
-            <FormGroup className="form-group-flex">
-                <ControlLabel>Categories From</ControlLabel>
-                <InputGroup>
-                    <Select
-                        value={filterData.categoriesFrom ? CATEGORIES_FROM_OPTIONS.find(opt => opt.value === filterData.categoriesFrom) : null}
-                        options={CATEGORIES_FROM_OPTIONS}
-                        placeholder="Select categories from..."
-                        onChange={(val) => onChange('data.categoriesFrom', val?.value)}
-                    />
-                </InputGroup>
-            </FormGroup>
-            <FormGroup className="form-group-flex">
-                <ControlLabel>Group by</ControlLabel>
-                <InputGroup>
-                    <Select
-                        value={filterData.groupBy ? GROUP_BY_OPTIONS.find(opt => opt.value === filterData.groupBy) : null}
-                        options={GROUP_BY_OPTIONS}
-                        placeholder="Select group by..."
-                        onChange={(val) => onChange('data.groupBy', val?.value)}
-                    />
-                </InputGroup>
-            </FormGroup>
-            <FormGroup className="form-group-flex">
-                <ControlLabel>Sort by</ControlLabel>
-                <InputGroup>
-                    <Select
-                        value={filterData.sortBy ? SORT_BY_OPTIONS.find(opt => opt.value === filterData.sortBy) : null}
-                        options={SORT_BY_OPTIONS}
-                        placeholder="Select sort by..."
-                        onChange={(val) => onChange('data.sortBy', val?.value)}
-                    />
-                </InputGroup>
-            </FormGroup>
+
+
+                    <FormGroup className="form-group-flex">
+                        <ControlLabel>Filter composition</ControlLabel>
+                        <InputGroup>
+                            <Select
+                                value={FILTER_COMPOSITION_OPTIONS.find(opt => opt.value === filterComposition)}
+                                options={FILTER_COMPOSITION_OPTIONS}
+                                placeholder="Select composition..."
+                                onChange={handleFilterCompositionChange}
+                            />
+                        </InputGroup>
+                    </FormGroup>
+
+                </>
+            )}
         </div>
     );
 };
 
-export default connect(
-    createSelector(
-        availableLayersSelector,
-        (layerOptions) => ({ layerOptions })
-    )
-)(FilterDataTab);
+const layerOptionsAndAttributesSelector = createSelector(
+    availableLayersSelector,
+    (layers = []) => {
+        const layerOptions = layers.map(({ value, label }) => ({ value, label }));
+        const layerAttributes = layers.reduce((acc, layer) => ({
+            ...acc,
+            [layer.value]: (layer.fields || [])
+                .filter(({ name }) => !!name)
+                .map(field => ({
+                    value: field.name,
+                    label: field.alias || field.name
+                }))
+        }), {});
+        const layerSources = layers.reduce((acc, layer) => ({
+            ...acc,
+            [layer.value]: layer.originalLayer
+        }), {});
+        return { layerOptions, layerAttributes, layerSources };
+    }
+);
 
+export default connect(
+    (state) => layerOptionsAndAttributesSelector(state)
+)(FilterDataTab);

@@ -18,18 +18,6 @@ const FilterLayoutTab = ({
 
     return (
         <div className="ms-filter-wizard-layout-tab">
-            <div className="ms-wizard-form-separator">Layout</div>
-            <FormGroup className="form-group-flex">
-                <ControlLabel>Label</ControlLabel>
-                <InputGroup>
-                    <FormControl
-                        type="text"
-                        value={data.label || ''}
-                        placeholder="Enter label..."
-                        onChange={(e) => onChange('label', e.target.value || undefined)}
-                    />
-                </InputGroup>
-            </FormGroup>
             <FormGroup className="form-group-flex">
                 <ControlLabel>Icon</ControlLabel>
                 <InputGroup>

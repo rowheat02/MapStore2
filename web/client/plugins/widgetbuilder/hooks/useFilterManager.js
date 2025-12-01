@@ -10,10 +10,14 @@ import { useMemo, useState } from 'react';
 const createEmptyFilterData = () => ({
     title: '',
     layer: undefined,
-    type: undefined,
-    categoriesFrom: undefined,
-    groupBy: undefined,
-    sortBy: undefined
+    dataSource: 'features',
+    valuesFrom: 'grouped',
+    valueAttribute: undefined,
+    labelAttribute: undefined,
+    sortBy: undefined,
+    maxFeatures: 200,
+    filterComposition: 'AND',
+    userDefinedItems: []
 });
 
 const initialFilters = [
@@ -42,10 +46,12 @@ const initialFilters = [
         data: {
             title: 'Regions (multi-select)',
             layer: 'layer-1',
-            type: 'category',
-            categoriesFrom: 'grouped_values',
-            groupBy: 'region',
-            sortBy: 'name'
+            dataSource: 'features',
+            valuesFrom: 'grouped',
+            valueAttribute: 'region',
+            sortBy: 'alphabetical',
+            filterComposition: 'AND',
+            userDefinedItems: []
         }
     },
     {
@@ -72,10 +78,12 @@ const initialFilters = [
         data: {
             title: 'Category (single-select)',
             layer: 'layer-1',
-            type: 'category',
-            categoriesFrom: 'grouped_values',
-            groupBy: 'category',
-            sortBy: 'name'
+            dataSource: 'features',
+            valuesFrom: 'grouped',
+            valueAttribute: 'category',
+            sortBy: 'alphabetical',
+            filterComposition: 'AND',
+            userDefinedItems: []
         }
     },
     {
@@ -102,10 +110,12 @@ const initialFilters = [
         data: {
             title: 'Status (multi-select)',
             layer: 'layer-1',
-            type: 'category',
-            categoriesFrom: 'grouped_values',
-            groupBy: 'status',
-            sortBy: 'name'
+            dataSource: 'features',
+            valuesFrom: 'grouped',
+            valueAttribute: 'status',
+            sortBy: 'alphabetical',
+            filterComposition: 'AND',
+            userDefinedItems: []
         }
     },
     {
@@ -132,10 +142,12 @@ const initialFilters = [
         data: {
             title: 'Owner (single-select)',
             layer: 'layer-1',
-            type: 'category',
-            categoriesFrom: 'grouped_values',
-            groupBy: 'owner',
-            sortBy: 'name'
+            dataSource: 'features',
+            valuesFrom: 'grouped',
+            valueAttribute: 'owner',
+            sortBy: 'alphabetical',
+            filterComposition: 'AND',
+            userDefinedItems: []
         }
     },
     {
@@ -159,10 +171,14 @@ const initialFilters = [
         data: {
             title: 'Priority (multi-select)',
             layer: 'layer-2',
-            type: 'category',
-            categoriesFrom: 'attribute_values',
-            groupBy: 'priority',
-            sortBy: 'name'
+            dataSource: 'features',
+            valuesFrom: 'single',
+            valueAttribute: 'priority',
+            labelAttribute: 'priority',
+            sortBy: 'alphabetical',
+            maxFeatures: 200,
+            filterComposition: 'AND',
+            userDefinedItems: []
         }
     },
     {
@@ -186,10 +202,14 @@ const initialFilters = [
         data: {
             title: 'Timeframe (single-select)',
             layer: 'layer-2',
-            type: 'date',
-            categoriesFrom: 'attribute_values',
-            groupBy: 'year',
-            sortBy: 'date'
+            dataSource: 'features',
+            valuesFrom: 'single',
+            valueAttribute: 'year',
+            labelAttribute: 'year',
+            sortBy: 'ascending',
+            maxFeatures: 200,
+            filterComposition: 'AND',
+            userDefinedItems: []
         }
     }
 ];

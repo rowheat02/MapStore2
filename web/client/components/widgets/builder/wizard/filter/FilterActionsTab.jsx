@@ -13,7 +13,6 @@ const FilterActionsTab = ({
 }) => {
     return (
         <div className="ms-filter-wizard-actions-tab">
-            <div className="ms-wizard-form-separator">Actions</div>
             <div className="ms-filter-actions-placeholder">
                 Actions content will go here
             </div>
