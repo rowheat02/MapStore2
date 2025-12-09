@@ -47,7 +47,12 @@ const InteractionButtons = (item, plugged, setPlugged, configuration, showConfig
         </FlexBox>
     );
 };
-
+const InteractionConfiguration = ({show}) => {
+    if (!show) return null;
+    return <>
+        <div>Config here</div>
+    </>;
+};
 const InteractionsRow = ({item, event}) => {
     // from interactions we can derive if the target is plugged or not, and its configuration
     const [plugged, setPlugged] = React.useState(false); // TODO derive from interaction
