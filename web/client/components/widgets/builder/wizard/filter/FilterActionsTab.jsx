@@ -1,10 +1,11 @@
 import React from 'react';
+import {connect} from 'react-redux';
 import { DATATYPES } from '../../../../../utils/InteractionUtils';
 import InteractionEditor from '../common/interactions/InteractionsEditor';
+import { getWidgetInteractionTree } from '../../../../../selectors/widgets';
 
-const FilterActionsTab = ({
-
-}) => {
+const FilterActionsTab = ({ widgetInteractionTree }) => {
+    console.log(widgetInteractionTree, "widgetInteractionTree");
 
     const events = [{
         type: 'filterChange',
@@ -19,11 +20,15 @@ const FilterActionsTab = ({
     }];
     return (
         <div className="ms-filter-wizard-actions-tab">
-            <InteractionEditor events={events} />
+            <InteractionEditor
+                events={events}
+            />
         </div>
     );
 };
 
-export default FilterActionsTab;
+export default connect((state) => ({
+    widgetInteractionTree: getWidgetInteractionTree(state)
+}), null)(FilterActionsTab);
 
 

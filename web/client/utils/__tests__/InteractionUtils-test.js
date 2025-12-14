@@ -1,6 +1,10 @@
 import expect from 'expect';
 import { find } from 'lodash';
-import { generateInteractionMetadataTree } from '../InteractionUtils';
+import {
+    generateInteractionMetadataTree,
+    generateChartWidgetTreeNode,
+    generateRootTree
+} from '../InteractionUtils';
 import widgets1 from '../../test-resources/widgets/widgets1.json';
 
 const TEST_DATA = {
@@ -56,6 +60,119 @@ describe('InteractionUtils', () => {
             expect(layerNode.interactionMetadata).toExist();
             expect(layerNode.interactionMetadata.targets.length).toBe(1);
             expect(layerNode.interactionMetadata.events[0].dataType).toBe('FEATURE_INFO');
+        });
+    });
+
+    describe('generateChartWidgetTreeNode', () => {
+        it('builds chart widget tree with multiple charts and traces', () => {
+            const widget = {
+                id: 'widget-id',
+                widgetType: 'chart',
+                title: 'US Workers',
+                charts: [{
+                    chartId: 'chart-1',
+                    traces: [{
+                        id: 'trace-1',
+                        type: 'pie',
+                        layer: { name: 'gs:us_states' }
+                    }]
+                }, {
+                    chartId: 'chart-2',
+                    traces: [{
+                        id: 'trace-2',
+                        type: 'bar',
+                        layer: { name: 'topp:states' }
+                    }]
+                }]
+            };
+
+            const tree = generateChartWidgetTreeNode(widget);
+
+            // 1. Verify widget structure
+            expect(tree.type).toBe('element');
+            expect(tree.id).toBe('widget-id');
+            expect(tree.children.length).toBe(2);
+
+            // 2. Verify chart elements are direct children
+            const firstChart = tree.children?.[0];
+            expect(firstChart.type).toBe('element');
+            expect(firstChart.id).toBe('chart-1');
+
+            // 3. Verify traces collection exists inside chart
+            const tracesCollection = firstChart.children?.[0];
+            expect(tracesCollection.type).toBe('collection');
+            expect(tracesCollection.name).toBe('traces');
+            expect(tracesCollection.interactionMetadata).toEqual({});
+
+            // 4. Verify trace node structure and properties
+            const traceNode = tracesCollection.children[0];
+            expect(traceNode.id).toBe('trace-1');
+            expect(traceNode.icon).toBe('pie-chart');
+            expect(traceNode.interactionMetadata?.targets?.[0]?.expectedDataType).toBe('LAYER_FILTER');
+
+            // 5. Verify multiple charts are handled correctly
+            const secondChart = tree.children?.[1];
+            expect(secondChart.id).toBe('chart-2');
+            expect(secondChart.children?.[0]?.children?.[0]?.icon).toBe('bar-chart');
+        });
+    });
+
+    describe('generateRootTree', () => {
+        it('generates root tree with all widget types', () => {
+            const widgets = [
+                {
+                    id: 'chart-widget-1',
+                    widgetType: 'chart',
+                    title: 'Chart Widget',
+                    charts: [{
+                        chartId: 'chart-1',
+                        traces: [{
+                            id: 'trace-1',
+                            type: 'pie',
+                            layer: { name: 'layer1' }
+                        }]
+                    }]
+                },
+                {
+                    id: 'table-widget-1',
+                    widgetType: 'table',
+                    title: 'Table Widget'
+                },
+                {
+                    id: 'counter-widget-1',
+                    widgetType: 'counter',
+                    title: 'Counter Widget'
+                }
+            ];
+
+            const rootTree = generateRootTree(widgets);
+            console.log(rootTree, 'generateRootTree result');
+
+            // Verify root structure
+            expect(rootTree.type).toBe('element');
+            expect(rootTree.name).toBe('root');
+            expect(rootTree.children.length).toBe(1);
+
+            // Verify widgets collection
+            const widgetsCollection = rootTree.children[0];
+            expect(widgetsCollection.type).toBe('collection');
+            expect(widgetsCollection.name).toBe('widgets');
+            expect(widgetsCollection.children.length).toBe(3);
+
+            // Verify chart widget
+            const chartWidget = widgetsCollection.children[0];
+            expect(chartWidget.id).toBe('chart-widget-1');
+            expect(chartWidget.children.length).toBe(1);
+
+            // Verify table widget
+            const tableWidget = widgetsCollection.children[1];
+            expect(tableWidget.id).toBe('table-widget-1');
+            expect(tableWidget.type).toBe('element');
+
+            // Verify counter widget
+            const counterWidget = widgetsCollection.children[2];
+            expect(counterWidget.id).toBe('counter-widget-1');
+            expect(counterWidget.type).toBe('element');
         });
     });
 });
