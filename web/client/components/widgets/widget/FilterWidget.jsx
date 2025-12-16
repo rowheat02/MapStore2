@@ -7,6 +7,7 @@
  */
 import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
+import { connect } from 'react-redux';
 
 import WidgetContainer from './WidgetContainer';
 import FilterView from '../../../plugins/widgetbuilder/FilterView';
@@ -14,6 +15,10 @@ import FilterCheckboxList from '../builder/wizard/filter/FilterCheckboxList';
 import FilterChipList from '../builder/wizard/filter/FilterChipList';
 import FilterDropdownList from '../builder/wizard/filter/FilterDropdownList';
 import FilterSwitchList from '../builder/wizard/filter/FilterSwitchList';
+import { emitFilterChange } from '../../../utils/WidgetEventEmitter';
+import { selectionsToFilterObj } from '../../../utils/FilterEventUtils';
+import { generateNodePath } from '../../../utils/InteractionUtils';
+import { getWidgetInteractionTree } from '../../../selectors/widgets';
 
 /**
  * FilterWidget component for rendering filter widgets in dashboard view
@@ -33,7 +38,9 @@ const FilterWidget = ({
     options = {},
     dataGrid = {},
     confirmDelete = false,
-    onDelete = () => {}
+    onDelete = () => {},
+    dispatch,
+    widgetInteractionTree
 } = {}) => {
     // Map of filter variant components
     const variantComponentMap = useMemo(() => ({
@@ -45,10 +52,39 @@ const FilterWidget = ({
 
     // Handle selection change for a specific filter
     const handleSelectionChange = (filterId) => (newValues) => {
+        // Update widget state
         updateProperty(id, 'selections', {
             ...selections,
             [filterId]: newValues
         });
+
+        // Emit filter change event
+        const filter = filters.find(f => f.id === filterId);
+        if (filter) {
+            // Convert selections to filterObj format
+            const filterObj = selectionsToFilterObj(filter, newValues);
+
+            // Get layer info for constraints
+            const layer = filter.data?.layer;
+            const constraints = layer ? {
+                layer: {
+                    name: layer.name,
+                    id: layer.id
+                }
+            } : {};
+
+            // Generate node path using generateNodePath
+            const nodePath = widgetInteractionTree ? generateNodePath(widgetInteractionTree, id) : null;
+
+            // Emit event (dispatch action directly)
+            emitFilterChange(
+                dispatch,
+                id,
+                filterObj,
+                constraints,
+                nodePath
+            );
+        }
     };
 
     return (
@@ -119,8 +155,12 @@ FilterWidget.propTypes = {
     options: PropTypes.object,
     dataGrid: PropTypes.object,
     confirmDelete: PropTypes.bool,
-    onDelete: PropTypes.func
+    onDelete: PropTypes.func,
+    dispatch: PropTypes.func,
+    widgetInteractionTree: PropTypes.object
 };
 
-export default FilterWidget;
+export default connect((state) => ({
+    widgetInteractionTree: getWidgetInteractionTree(state)
+}))(FilterWidget);
 

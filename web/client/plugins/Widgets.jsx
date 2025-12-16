@@ -37,6 +37,7 @@ import {
 } from '../actions/widgets';
 import editOptions from './widgets/editOptions';
 import autoDisableWidgets from './widgets/autoDisableWidgets';
+// Event Bus removed - events now go through Redux actions directly
 
 const RIGHT_MARGIN = 55;
 import { widthProvider, heightProvider } from '../components/layout/enhancers/gridLayout';
@@ -283,8 +284,12 @@ class Widgets extends React.Component {
         enabled: true,
         enableZoomInTblWidget: true
     };
+    static contextTypes = {
+        store: PropTypes.object
+    };
     componentDidMount() {
         this.props.onMount(this.props.pluginCfg?.defaults);
+        // Event Bus removed - events now go through Redux actions directly
     }
     render() {
         return this.props.enabled ? <WidgetsView {...this.props /* pass options to the plugin */ } /> : null;
@@ -347,7 +352,11 @@ export default createPlugin("WidgetsPlugin", {
         }
     },
     reducers: {
-        widgets: require('../reducers/widgets').default
+        widgets: require('../reducers/widgets').default,
+        interactions: require('../reducers/interactions').default
     },
-    epics: require('../epics/widgets').default
+    epics: {
+        ...require('../epics/widgets').default,
+        ...require('../epics/interactions').default
+    }
 });

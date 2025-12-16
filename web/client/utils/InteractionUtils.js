@@ -412,7 +412,7 @@ export function generateChartTraceTreeNode(trace) {
  */
 function generateChartElementNode(chart, widgetTitle) {
     return {
-        type: "element",
+        type: "collection",
         id: chart?.chartId || chart?.id,
         title: widgetTitle,
         icon: 'stats',
@@ -546,7 +546,7 @@ export function generateWidgetTreeNode(widget) {
  * @param {object} support object with matching criteria (e.g., {title: "Charts"})
  * @returns {object} modified tree with matching nodes detached
  */
-function detachNodeAndPromoteChildren(tree, support) {
+export function detachNodeAndPromoteChildren(tree, support) {
     if (!tree || !support) return tree;
 
     const matchesCriteria = (child) => {
@@ -596,17 +596,16 @@ export function generateRootTree(widgets) {
         .map(widget => generateWidgetTreeNode(widget));
 
     const tree = {
-        type: "element",
+        type: "collection",
         name: "root",
         children: [{
             type: "collection",
             name: "widgets",
+            id: "widgets",
             children: widgetNodes
         }]
     };
-
-    // Detach intermediate collection nodes like "Charts" and promote their children
-    return detachNodeAndPromoteChildren(tree, { title: "Charts" });
+    return tree;
 }
 
 /**
@@ -766,5 +765,172 @@ export function getTargetsByWidgetType(widgetType, layerInvolved) {
             }
         } : {}
     }));
+}
+
+/**
+ * Generates a string path to locate a node by its id in the tree.
+ * The path format is: root.collectionName[elementId].collectionName[elementId]...
+ * Example: root.widgets[chart-1].traces[trace-1]
+ * @param {object} tree root metadata tree
+ * @param {string} nodeId the id of the node to find
+ * @returns {string|null} string path representing the navigation path, or null if node not found
+ */
+export function generateNodePath(tree, nodeId) {
+    if (!tree || !nodeId) {
+        // eslint-disable-next-line no-console
+        console.log('generateNodePath: invalid input', { tree, nodeId });
+        return null;
+    }
+
+    const findPath = (node, targetId, currentPath = 'root') => {
+        // Check if current node matches
+        if (node?.id === targetId) {
+            // eslint-disable-next-line no-console
+            console.log('generateNodePath: found node', { nodeId: targetId, path: currentPath });
+            return currentPath;
+        }
+
+        // Search in children
+        const children = node?.children || [];
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            let nextPath = currentPath;
+
+            // Build path segment based on node type
+            if (child.type === 'collection' && child.name) {
+                // Collection: use the collection name
+                nextPath = `${currentPath}.${child.name}`;
+            } else if (child.id) {
+                // Element: use [id] format
+                nextPath = `${currentPath}[${child.id}]`;
+            } else {
+                // Fallback: use index if no name/id
+                nextPath = `${currentPath}[${i}]`;
+            }
+
+            const childPath = findPath(child, targetId, nextPath);
+            if (childPath !== null) {
+                return childPath;
+            }
+        }
+
+        return null;
+    };
+
+    const path = findPath(tree, nodeId);
+    return path;
+}
+
+/**
+ * Evaluates a string path to retrieve the node at that location in the tree.
+ * Path format: root.collectionName[elementId].collectionName[elementId]...
+ * Example: root.widgets[chart-1].traces[trace-1]
+ * @param {object} tree root metadata tree
+ * @param {string} path string path representing the navigation path
+ * @returns {object|null} the node at the path location, or null if path is invalid
+ */
+export function evaluatePath(tree, path) {
+    if (!tree || !path || typeof path !== 'string') {
+        return null;
+    }
+
+    // Remove 'root.' or 'root' prefix if present
+    let remainingPath = path;
+    if (path.startsWith('root.')) {
+        remainingPath = path.substring(5);
+    } else if (path.startsWith('root') && path.length > 4) {
+        remainingPath = path.substring(4);
+    }
+
+    let currentNode = tree;
+    // eslint-disable-next-line no-console
+    console.log('evaluatePath: starting traversal', { path, remainingPath });
+
+    // Parse path segments: collectionName or [elementId]
+    const segments = [];
+
+    // Improved parsing: handle both .collectionName and [elementId] patterns
+    // Match pattern: .name or [id]
+    let index = 0;
+    while (index < remainingPath.length) {
+        // Skip leading dots
+        if (remainingPath[index] === '.') {
+            index++;
+            continue;
+        }
+
+        // Check for [id] pattern
+        if (remainingPath[index] === '[') {
+            const closingBracket = remainingPath.indexOf(']', index);
+            if (closingBracket !== -1) {
+                const id = remainingPath.substring(index + 1, closingBracket);
+                segments.push({ type: 'element', value: id });
+                index = closingBracket + 1;
+            } else {
+                // Invalid bracket, skip
+                index++;
+            }
+        } else {
+            // Collection name - find the next [ or . or end
+            let endIndex = remainingPath.length;
+            const nextBracket = remainingPath.indexOf('[', index);
+            const nextDot = remainingPath.indexOf('.', index);
+
+            if (nextBracket !== -1 && (nextDot === -1 || nextBracket < nextDot)) {
+                endIndex = nextBracket;
+            } else if (nextDot !== -1) {
+                endIndex = nextDot;
+            }
+
+            if (endIndex > index) {
+                const name = remainingPath.substring(index, endIndex);
+                if (name) {
+                    segments.push({ type: 'collection', value: name });
+                }
+                index = endIndex;
+            } else {
+                index++;
+            }
+        }
+    }
+
+    // eslint-disable-next-line no-console
+    console.log('evaluatePath: parsed segments', { segments });
+
+    // Traverse the tree using segments
+    for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i];
+        const children = currentNode?.children || [];
+
+        let foundChild = null;
+
+        if (segment.type === 'collection') {
+            // Find child by collection name
+            foundChild = children.find(child => child.name === segment.value && child.type === 'collection');
+        } else if (segment.type === 'element') {
+            // Find child by element id
+            foundChild = children.find(child => child.id === segment.value);
+        } else if (segment.type === 'unknown') {
+            // Try both collection name and element id
+            foundChild = children.find(child =>
+                (child.name === segment.value && child.type === 'collection') ||
+                child.id === segment.value
+            );
+        }
+
+        if (!foundChild) {
+            // eslint-disable-next-line no-console
+            console.log('evaluatePath: segment not found', { segment, step: i, currentNode: currentNode?.id || currentNode?.name });
+            return null;
+        }
+
+        currentNode = foundChild;
+        // eslint-disable-next-line no-console
+        console.log('evaluatePath: step', { step: i, segment, nodeId: currentNode?.id, nodeName: currentNode?.name, nodeTitle: currentNode?.title });
+    }
+
+    // eslint-disable-next-line no-console
+    console.log('evaluatePath: result', { path, node: currentNode });
+    return currentNode;
 }
 
