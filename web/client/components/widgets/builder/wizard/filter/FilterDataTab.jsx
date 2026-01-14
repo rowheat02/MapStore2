@@ -15,6 +15,7 @@ import { currentLocaleSelector } from '../../../../../selectors/locale';
 import { getLayerTitle } from '../../../../../utils/LayersUtils';
 import InfoPopover from '../../../widget/InfoPopover';
 import UserDefinedValuesDataGrid from './UserDefinedValuesDataGrid';
+import LayerStylesList from './LayerStylesList';
 import { describeFeatureType } from '../../../../../observables/wfs';
 import { describeFeatureTypeToAttributes } from '../../../../../utils/FeatureTypeUtils';
 import sortByAttributesIcon from '../../../../../themes/default/svg/sort-by-attributes.svg';
@@ -342,6 +343,20 @@ const FilterDataTab = ({
                     </InputGroup.Button>
                 </InputGroup>
             </FormGroup>
+
+            {hasLayerSelection && selectedLayerObject?.type === 'wms' && (
+                <FormGroup className="form-group-flex">
+                    <ControlLabel>Layer Style</ControlLabel>
+                    <LayerStylesList
+                        layer={selectedLayerObject}
+                        selectedStyle={filterData.style}
+                        onSelect={(style) => {
+                            const styleName = typeof style === 'object' ? style.name : style;
+                            onChange('data.style', styleName);
+                        }}
+                    />
+                </FormGroup>
+            )}
 
             {isFeaturesSource && (
                 <>
