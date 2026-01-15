@@ -1,0 +1,126 @@
+/*
+ * Copyright 2025, GeoSolutions Sas.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+import { useMemo } from 'react';
+import { DATA_SOURCE_TYPES, VALUES_FROM_TYPES, USER_DEFINED_TYPES } from '../constants';
+
+// Inline layer utility functions
+const normalizeLayer = (layer, layerSources = {}) => {
+    if (!layer) return null;
+    if (typeof layer === 'object') return layer;
+    if (typeof layer === 'string') return layerSources[layer] || null;
+    return null;
+};
+
+const getLayerId = (layer) => {
+    if (!layer) return null;
+    if (typeof layer === 'string') return layer;
+    if (typeof layer === 'object') return layer.id || layer.name || null;
+    return null;
+};
+
+const getLayerKey = (layer, layerId = null) => {
+    if (layer && typeof layer === 'object') {
+        return layer.id || layer.name || layerId;
+    }
+    return layerId;
+};
+
+// Inline filter data utility functions
+const normalizeUserDefinedItems = (userDefinedItems = []) => {
+    return userDefinedItems.map(item => {
+        const filterEntry = typeof item?.filter === 'string'
+            ? { expression: item.filter }
+            : (item?.filter || null);
+
+        return {
+            id: item?.id,
+            label: item?.label || '',
+            value: item?.value || '',
+            filter: filterEntry,
+            style: item?.style || ''
+        };
+    });
+};
+
+const normalizeMaxFeatures = (maxFeatures) => {
+    return Number.isFinite(maxFeatures) ? maxFeatures : '';
+};
+
+/**
+ * Custom hook that normalizes and derives filter data for easier consumption.
+ *
+ * @param {object} data - Raw filter data
+ * @param {object} layerSources - Map of layer sources by ID
+ * @returns {object} Normalized filter data with derived values
+ */
+export const useFilterData = (data = {}, layerSources = {}) => {
+    return useMemo(() => {
+        const filterData = data?.data || {};
+
+        // Normalize layer
+        const selectedLayerId = getLayerId(filterData.layer);
+        const selectedLayerObject = normalizeLayer(filterData.layer, layerSources);
+        const selectedLayerKey = getLayerKey(selectedLayerObject, selectedLayerId);
+
+        // Data source flags
+        const dataSource = filterData.dataSource;
+        const isUserDefined = dataSource === DATA_SOURCE_TYPES.USER_DEFINED;
+        const isFeaturesSource = dataSource === DATA_SOURCE_TYPES.FEATURES;
+        const layerIsRequired = !!dataSource;
+
+        // Values from
+        const valuesFrom = filterData.valuesFrom || VALUES_FROM_TYPES.GROUPED;
+
+        // Attributes
+        const valueAttribute = filterData.valueAttribute ?? null;
+        const labelAttribute = filterData.labelAttribute ?? null;
+        const sortByAttribute = filterData.sortByAttribute ?? null;
+        const sortOrder = filterData.sortOrder;
+
+        // Other settings
+        const maxFeaturesValue = normalizeMaxFeatures(filterData.maxFeatures);
+        const filterComposition = filterData.filterComposition;
+        const userDefinedType = filterData.userDefinedType || USER_DEFINED_TYPES.FILTER_LIST;
+
+        // User defined items
+        const userDefinedItems = normalizeUserDefinedItems(filterData.userDefinedItems);
+
+        return {
+            // Raw data
+            filterData,
+            selectedLayerId,
+            selectedLayerObject,
+            selectedLayerKey,
+
+            // Data source
+            dataSource,
+            isUserDefined,
+            isFeaturesSource,
+            layerIsRequired,
+
+            // Values from
+            valuesFrom,
+
+            // Attributes
+            valueAttribute,
+            labelAttribute,
+            sortByAttribute,
+            sortOrder,
+
+            // Other
+            maxFeaturesValue,
+            filterComposition,
+            userDefinedType,
+            userDefinedItems,
+
+            // Flags
+            hasLayerSelection: !!selectedLayerObject
+        };
+    }, [data, layerSources]);
+};
+
