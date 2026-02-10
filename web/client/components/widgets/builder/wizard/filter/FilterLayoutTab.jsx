@@ -191,7 +191,8 @@ const FilterLayoutTab = ({
                                             { value: 'checkbox', label: 'Checkbox' },
                                             { value: 'button', label: 'Button' },
                                             { value: 'dropdown', label: 'Dropdown' },
-                                            { value: 'switch', label: 'Switch' }
+                                            { value: 'switch', label: 'Switch' },
+                                            { value: 'slider', label: 'Slider' }
                                         ]}
                                         placeholder="Select variant..."
                                         onChange={(val) => onChange('layout.variant', val?.value)}

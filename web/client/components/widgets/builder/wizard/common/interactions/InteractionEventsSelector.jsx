@@ -19,11 +19,12 @@ import Message from '../../../../../I18N/Message';
 
 const targetTitleTranslationMap = {
     "Apply filter": "widgets.filterWidget.applyFilter",
-    "Apply style": "widgets.filterWidget.applyStyle"
+    "Apply style": "widgets.filterWidget.applyStyle",
+    "Apply Dimension": "widgets.filterWidget.applyDimension"
 };
 
 
-const InteractionEventsSelector = ({target, expanded, toggleExpanded = () => {}, interactionTree, interactions, sourceWidgetId, currentSourceId, onEditorChange, alreadyExistingInteractions}) => {
+const InteractionEventsSelector = ({target, expanded, toggleExpanded = () => {}, interactionTree, interactions, sourceWidgetId, currentSourceId, onEditorChange, onRemoveTarget = () => {}, alreadyExistingInteractions}) => {
 
     const filteredInteractionTree = useMemo(() => {
         const filteredTree = filterTreeWithTarget(interactionTree, target) || [];
@@ -42,8 +43,19 @@ const InteractionEventsSelector = ({target, expanded, toggleExpanded = () => {},
                     }
                 </Button>
                 <Glyphicon glyph={target?.glyph} />
-                <Text className="ms-flex-fill" fontSize="md"><Message msgId={targetTitleTranslationMap[target.title] || ""} /></Text>
-
+                <Text className="ms-flex-fill" fontSize="md">
+                    {targetTitleTranslationMap[target.title]
+                        ? <Message msgId={targetTitleTranslationMap[target.title]} />
+                        : target.title}
+                </Text>
+                {target?.isOptional && (
+                    <Button
+                        borderTransparent
+                        onClick={() => onRemoveTarget(target.targetType)}
+                        style={{ padding: 0, marginRight: '8px', background: 'transparent' }}>
+                        <Glyphicon glyph="remove" />
+                    </Button>
+                )}
 
             </FlexBox>
             {expanded && <FlexBox className="ms-interactions-targets" component="ul" column gap="sm" >

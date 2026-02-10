@@ -5,6 +5,10 @@ import InteractionEditor from '../common/interactions/InteractionsEditor';
 import FlexBox from '../../../../layout/FlexBox';
 import { getEditingWidget, getWidgetInteractionTreeGenerated } from '../../../../../selectors/widgets';
 import Message from '../../../../I18N/Message';
+import { DropdownButton, MenuItem, Glyphicon } from 'react-bootstrap';
+import tooltip from '../../../../misc/enhancers/tooltip';
+
+const TDropdownButton = tooltip(DropdownButton);
 
 
 const FilterActionsTab = ({
@@ -13,18 +17,46 @@ const FilterActionsTab = ({
     onEditorChange = () => {}
 }) => {
 
-
     const memoizedTargets = useMemo(() => {
         return getPossibleTargetsEditingWidget("filter", data?.data?.layer);
     }, [data?.data?.layer]);
 
-
-    const [targets, setTargets] = useState(memoizedTargets);
+    const [baseTargets, setBaseTargets] = useState([]);
+    const [optionalTargets, setOptionalTargets] = useState([]);
 
     useEffect(() => {
         const isStyle = data?.data?.dataSource === "userDefined" && data.data.userDefinedType === "styleList";
-        setTargets(isStyle ? memoizedTargets.filter(t => t.targetType === TARGET_TYPES.APPLY_STYLE) : memoizedTargets.filter(t => t.targetType === TARGET_TYPES.APPLY_FILTER));
+        const requiredTargetType = isStyle ? TARGET_TYPES.APPLY_STYLE : TARGET_TYPES.APPLY_FILTER;
+        const availableOptionalTargets = memoizedTargets.filter(t => t.isOptional);
+        setBaseTargets(memoizedTargets.filter(t => !t.isOptional && t.targetType === requiredTargetType));
+        setOptionalTargets(prevOptionalTargets => prevOptionalTargets.filter(
+            optionalTarget => availableOptionalTargets.some(availableTarget => availableTarget.targetType === optionalTarget.targetType)
+        ));
     }, [memoizedTargets, data]);
+
+    const availableOptionalTargets = useMemo(() => {
+        return memoizedTargets.filter(target => target.isOptional);
+    }, [memoizedTargets]);
+
+    const visibleTargets = useMemo(() => {
+        return [...baseTargets, ...optionalTargets];
+    }, [baseTargets, optionalTargets]);
+
+    const addOptionalTarget = (targetType) => {
+        const target = availableOptionalTargets.find(item => item.targetType === targetType);
+        if (!target || optionalTargets.some(item => item.targetType === targetType)) {
+            return;
+        }
+        setOptionalTargets(prevOptionalTargets => [...prevOptionalTargets, target]);
+    };
+
+    const removeOptionalTarget = (targetType) => {
+        setOptionalTargets(prevOptionalTargets => prevOptionalTargets.filter(target => target.targetType !== targetType));
+    };
+
+    const notSelectedOptionalTargets = availableOptionalTargets.filter(
+        target => !optionalTargets.some(selectedTarget => selectedTarget.targetType === target.targetType)
+    );
 
     return (
         <div className="ms-filter-wizard-actions-tab">
@@ -37,8 +69,34 @@ const FilterActionsTab = ({
                 <div style={{flex: 1}}>
                     <Message msgId="widgets.filterWidget.onSelectionChange" />
                 </div>
+                <TDropdownButton
+                    id="filter-optional-targets-dropdown"
+                    noCaret
+                    className="square-button no-border"
+                    title={<Glyphicon glyph="plus" />}
+                    tooltip={<Message msgId="widgets.filterWidget.addOptionalTarget" />}
+                    pullRight
+                    bsStyle="default">
+                    {notSelectedOptionalTargets.map(target => (
+                        <MenuItem
+                            key={target.targetType}
+                            onSelect={() => addOptionalTarget(target.targetType)}>
+                            {target.title}
+                        </MenuItem>
+                    ))}
+                    {notSelectedOptionalTargets.length === 0 && (
+                        <MenuItem disabled>No optional targets available</MenuItem>
+                    )}
+                </TDropdownButton>
             </FlexBox>
-            <InteractionEditor targets={targets} sourceWidgetId={sourceWidgetId} currentSourceId={data?.id} onEditorChange={onEditorChange} isStyleOnly={data?.data?.dataSource === "userDefined" && data.data.userDefinedType === "styleList"} />
+            <InteractionEditor
+                targets={visibleTargets}
+                sourceWidgetId={sourceWidgetId}
+                currentSourceId={data?.id}
+                onEditorChange={onEditorChange}
+                onRemoveTarget={removeOptionalTarget}
+                isStyleOnly={data?.data?.dataSource === "userDefined" && data.data.userDefinedType === "styleList"}
+            />
         </div>
     );
 };
@@ -50,5 +108,3 @@ export default connect((state) => {
         sourceWidgetId: editingWidget?.id
     };
 }, null)(FilterActionsTab);
-
-

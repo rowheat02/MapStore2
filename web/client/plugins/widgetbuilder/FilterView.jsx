@@ -19,6 +19,7 @@ import FilterCheckboxList from '../../components/widgets/builder/wizard/filter/F
 import FilterChipList from '../../components/widgets/builder/wizard/filter/FilterChipList';
 import FilterDropdownList from '../../components/widgets/builder/wizard/filter/FilterDropdownList';
 import FilterSwitchList from '../../components/widgets/builder/wizard/filter/FilterSwitchList';
+import FilterSliderList from '../../components/widgets/builder/wizard/filter/FilterSliderList';
 import FilterNoSelectableItems from '../../components/widgets/builder/wizard/filter/FilterNoSelectableItems';
 import { isFilterSelectionValid } from './utils/filterBuilder';
 import InfoPopover from '../../components/widgets/widget/InfoPopover';
@@ -62,7 +63,8 @@ const componentMap = {
     checkbox: FilterCheckboxList,
     button: FilterChipList,
     dropdown: FilterDropdownList,
-    'switch': FilterSwitchList
+    'switch': FilterSwitchList,
+    slider: FilterSliderList
 };
 const FilterView = ({
     className,
@@ -146,6 +148,12 @@ const FilterView = ({
             };
         }
         if (layout.variant === 'switch') {
+            return {
+                layoutDirection: layout.direction,
+                layoutMaxHeight: layout.maxHeight
+            };
+        }
+        if (layout.variant === 'slider') {
             return {
                 layoutDirection: layout.direction,
                 layoutMaxHeight: layout.maxHeight

@@ -1,7 +1,8 @@
 
 export const DATATYPES = {
     LAYER_FILTER: 'LAYER_FILTER',
-    LAYER_STYLE: 'LAYER_STYLE'
+    LAYER_STYLE: 'LAYER_STYLE',
+    DIMENSION_VALUE: 'Dimension Value'
 };
 
 export const EVENTS = {
@@ -10,19 +11,22 @@ export const EVENTS = {
 
 export const TARGET_TYPES = {
     APPLY_FILTER: 'applyFilter',
-    APPLY_STYLE: 'applyStyle'
+    APPLY_STYLE: 'applyStyle',
+    APPLY_DIMENSION: 'applyDimension'
 };
 
 // Human-readable labels for target types
 export const TARGET_TYPE_LABELS = {
     [TARGET_TYPES.APPLY_FILTER]: 'Apply filter',
-    [TARGET_TYPES.APPLY_STYLE]: 'Apply style'
+    [TARGET_TYPES.APPLY_STYLE]: 'Apply style',
+    [TARGET_TYPES.APPLY_DIMENSION]: 'Apply Dimension'
 };
 
 // Glyph icons for target types
 export const TARGET_TYPE_GLYPHS = {
     [TARGET_TYPES.APPLY_FILTER]: 'filter',
-    [TARGET_TYPES.APPLY_STYLE]: 'style'
+    [TARGET_TYPES.APPLY_STYLE]: 'style',
+    [TARGET_TYPES.APPLY_DIMENSION]: 'record'
 };
 
 /**
@@ -30,12 +34,13 @@ export const TARGET_TYPE_GLYPHS = {
  * Values are arrays to support multiple targets per event.
  */
 export const EVENT_TARGET_MAP = {
-    [EVENTS.FILTER_CHANGE]: [TARGET_TYPES.APPLY_FILTER, TARGET_TYPES.APPLY_STYLE]
+    [EVENTS.FILTER_CHANGE]: [TARGET_TYPES.APPLY_FILTER, TARGET_TYPES.APPLY_STYLE, TARGET_TYPES.APPLY_DIMENSION]
 };
 
 export const TARGET_EVENT_DATA_TYPES = {
     [TARGET_TYPES.APPLY_FILTER]: DATATYPES.LAYER_FILTER,
-    [TARGET_TYPES.APPLY_STYLE]: DATATYPES.LAYER_STYLE
+    [TARGET_TYPES.APPLY_STYLE]: DATATYPES.LAYER_STYLE,
+    [TARGET_TYPES.APPLY_DIMENSION]: DATATYPES.DIMENSION_VALUE
 };
 
 // Events available by widget type
@@ -73,6 +78,11 @@ export const WIDGET_TARGETS_BY_TYPE = {
         {
             targetType: TARGET_TYPES.APPLY_STYLE,
             expectedDataType: DATATYPES.LAYER_STYLE,
+            constraints: {}
+        },
+        {
+            targetType: TARGET_TYPES.APPLY_DIMENSION,
+            expectedDataType: DATATYPES.DIMENSION_VALUE,
             constraints: {}
         }
     ],
@@ -210,19 +220,24 @@ function createBaseCollectionNode(title, children = [], icon, id) {
     };
 }
 
-export function generateLayerMetadataTree(layer) {
+export function generateLayerMetadataTree(layer, targetTypes) {
+    const allowedTargetTypes = Array.isArray(targetTypes) && targetTypes.length > 0
+        ? targetTypes
+        : null;
     const baseNode = createBaseElementNode(layer, '1-layer');
     return {
         ...baseNode,
         interactionMetadata: {
-            targets: WIDGET_TARGETS_BY_TYPE.layer.map(t => {
-                return {
-                    ...t,
-                    constraints: {
-                        layer: createLayerConstraint(layer.name)
-                    }
-                };
-            })
+            targets: WIDGET_TARGETS_BY_TYPE.layer
+                .filter(t => !allowedTargetTypes || allowedTargetTypes.includes(t.targetType))
+                .map(t => {
+                    return {
+                        ...t,
+                        constraints: {
+                            layer: createLayerConstraint(layer.name)
+                        }
+                    };
+                })
         }
     };
 }
@@ -240,8 +255,10 @@ export function isInteractionSupported(layer) {
  * @param {object[]} layers array of layers
  * @returns {object[]}
  */
-export function generateLayersMetadataTree(layers) {
-    return layers.filter(isInteractionSupported).map(generateLayerMetadataTree);
+export function generateLayersMetadataTree(layers, targetTypes) {
+    return layers
+        .filter(isInteractionSupported)
+        .map(layer => generateLayerMetadataTree(layer, targetTypes));
 }
 
 /**
@@ -257,19 +274,39 @@ export function generateMapWidgetLayersTree(maps) {
     const mapCollectionNodes = maps
         .filter(map => map?.layers && Array.isArray(map.layers))
         .map(map => {
-            const layerNodes = generateLayersMetadataTree(map.layers);
+            const layerNodes = generateLayersMetadataTree(map.layers, [TARGET_TYPES.APPLY_FILTER, TARGET_TYPES.APPLY_STYLE]);
             const layersCollection = createBaseCollectionNode(
                 "Layers",
                 layerNodes,
                 "1-layer",
                 "layers"
             );
+            const layerTimeNodes = generateLayersMetadataTree(map.layers, [TARGET_TYPES.APPLY_DIMENSION]);
+            const layerElevationNodes = generateLayersMetadataTree(map.layers, [TARGET_TYPES.APPLY_DIMENSION]);
+            const timeCollection = createBaseCollectionNode(
+                "Time",
+                layerTimeNodes,
+                "time",
+                "time"
+            );
+            const elevationCollection = createBaseCollectionNode(
+                "Elevation",
+                layerElevationNodes,
+                "1-vector",
+                "elevation"
+            );
+            const dimensionCollection = createBaseCollectionNode(
+                "Dimension",
+                [timeCollection, elevationCollection],
+                undefined,
+                "dimension"
+            );
             const baseNode = createBaseElementNode(map, '1-map');
             return {
                 ...baseNode,
                 type: "collection",
                 ...createBaseProperties(map.name || "No Title", "1-map", map.mapId),
-                children: [layersCollection]
+                children: [layersCollection, dimensionCollection]
             };
         });
 
@@ -517,13 +554,36 @@ export function generateRootTree(widgets, mapLayers) {
         .map(widget => generateWidgetTreeNode(widget));
 
     const mapLayersNodes = mapLayers?.length > 0 ? [
-        createBaseCollectionNode("Layers", generateLayersMetadataTree(mapLayers), "1-layer", "layers")
+        createBaseCollectionNode(
+            "Layers",
+            generateLayersMetadataTree(mapLayers, [TARGET_TYPES.APPLY_FILTER, TARGET_TYPES.APPLY_STYLE]),
+            "1-layer",
+            "layers"
+        )
     ] : [];
 
     const widgetsCollection = createBaseCollectionNode("Widgets", widgetNodes, "widgets", "widgets");
     const collections = [widgetsCollection];
     if (mapLayersNodes.length > 0) {
-        const mapsCollection = createBaseCollectionNode("Map", mapLayersNodes, "1-map", "map");
+        const mapTimeNode = {
+            ...createBaseElementNode({ id: "mapTime", title: "Map time" }, "time"),
+            interactionMetadata: {
+                targets: [{
+                    targetType: TARGET_TYPES.APPLY_DIMENSION,
+                    expectedDataType: TARGET_EVENT_DATA_TYPES[TARGET_TYPES.APPLY_DIMENSION],
+                    constraints: {}
+                }]
+            }
+        };
+        const layerElevationNodes = generateLayersMetadataTree(mapLayers, [TARGET_TYPES.APPLY_DIMENSION]);
+        const elevationCollection = createBaseCollectionNode(
+            "Elevation",
+            layerElevationNodes,
+            "1-vector",
+            "elevation"
+        );
+        const mapCollectionChildren = [...mapLayersNodes, mapTimeNode, elevationCollection];
+        const mapsCollection = createBaseCollectionNode("Map", mapCollectionChildren, "1-map", "map");
         collections.push(mapsCollection);
     }
 
@@ -631,6 +691,7 @@ export function getPossibleTargetsEditingWidget(widgetType, layerInvolved) {
             targetType: TARGET_TYPES.APPLY_FILTER,
             glyph: TARGET_TYPE_GLYPHS[TARGET_TYPES.APPLY_FILTER],
             expectedDataType: TARGET_EVENT_DATA_TYPES[TARGET_TYPES.APPLY_FILTER],
+            isOptional: false,
             constraints: layerInvolved ? {
                 layer: createLayerConstraint(layerInvolved.name)
             } : {}
@@ -640,6 +701,17 @@ export function getPossibleTargetsEditingWidget(widgetType, layerInvolved) {
             targetType: TARGET_TYPES.APPLY_STYLE,
             glyph: TARGET_TYPE_GLYPHS[TARGET_TYPES.APPLY_STYLE],
             expectedDataType: TARGET_EVENT_DATA_TYPES[TARGET_TYPES.APPLY_STYLE],
+            isOptional: false,
+            constraints: layerInvolved ? {
+                layer: createLayerConstraint(layerInvolved.name)
+            } : {}
+        },
+        {
+            title: TARGET_TYPE_LABELS[TARGET_TYPES.APPLY_DIMENSION],
+            targetType: TARGET_TYPES.APPLY_DIMENSION,
+            glyph: TARGET_TYPE_GLYPHS[TARGET_TYPES.APPLY_DIMENSION],
+            expectedDataType: TARGET_EVENT_DATA_TYPES[TARGET_TYPES.APPLY_DIMENSION],
+            isOptional: true,
             constraints: layerInvolved ? {
                 layer: createLayerConstraint(layerInvolved.name)
             } : {}

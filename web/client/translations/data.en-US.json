@@ -2498,6 +2498,8 @@
         "onSelectionChange": "On Selection Change",
 
         "applyFilter": "Apply Filter",
+        "applyDimension": "Apply Dimension",
+        "addOptionalTarget": "Add Optional Target",
 
         "selectAll": "Select All",
         "clear": "Clear",

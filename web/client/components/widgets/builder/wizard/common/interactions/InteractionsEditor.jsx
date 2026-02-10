@@ -3,7 +3,7 @@ import InteractionEventsSelector from "./InteractionEventsSelector";
 import { TARGET_TYPES } from '../../../../../../utils/InteractionUtils';
 
 // currentSourceId is the source that will be source of the target, in filter widget 'filterId' is expected
-const InteractionEditor = ({targets = [], sourceWidgetId, currentSourceId, onEditorChange = () => {}, isStyleOnly = false}) => {
+const InteractionEditor = ({targets = [], sourceWidgetId, currentSourceId, onEditorChange = () => {}, onRemoveTarget = () => {}, isStyleOnly = false}) => {
     const initialExpandedItems = targets.length > 0 ? [targets[0].targetType] : [];
     const [expandedItems, setExpandedItems] = useState(initialExpandedItems);
     const toggleExpanded = (name) => {
@@ -32,6 +32,7 @@ const InteractionEditor = ({targets = [], sourceWidgetId, currentSourceId, onEdi
                 sourceWidgetId={sourceWidgetId}
                 currentSourceId={currentSourceId}
                 onEditorChange={onEditorChange}
+                onRemoveTarget={onRemoveTarget}
             />);
         })}
     </>;
