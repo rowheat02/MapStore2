@@ -15,6 +15,7 @@ import {
     LegendWidget,
     FilterWidget
 } from './enhancedWidgets';
+import CustomWidgetFrame from './CustomWidgetFrame';
 
 const getWidgetOpts = (w) => w?.widgetOpts?.[w.widgetType];
 
@@ -24,12 +25,31 @@ const getWidgetOpts = (w) => w?.widgetOpts?.[w.widgetType];
 const DefaultWidget = ({
     items,
     dependencies,
+    customWidgets = [],
     toggleCollapse = () => {},
     exportCSV = () => {},
     onDelete = () => {},
     onEdit = () => {},
     ...w
-} = {}) => w.widgetType === "text"
+} = {}) => {
+    const customItem = customWidgets.find(({ type }) => type === w.type);
+    const { Component } = customItem || {};
+    if (Component) {
+        return (
+            <CustomWidgetFrame
+                Component={Component}
+                {...w}
+                {...getWidgetOpts(w)}
+                items={items}
+                toggleCollapse={toggleCollapse}
+                exportCSV={exportCSV}
+                dependencies={dependencies}
+                onDelete={onDelete}
+                onEdit={onEdit}
+            />
+        );
+    }
+    return w.widgetType === "text"
     ? (<TextWidget {...w}
         toggleCollapse={toggleCollapse}
         onDelete={onDelete}
@@ -81,4 +101,5 @@ const DefaultWidget = ({
                             dependencies={dependencies}
                             onDelete={onDelete}
                             onEdit={onEdit} />);
+};
 export default DefaultWidget;
