@@ -10,7 +10,15 @@
 // Theme
 // **************
 
-// #ms-components-theme(@theme-vars) {}
+#ms-components-theme(@theme-vars) {
+    .rw-btn {
+        .color-var(@theme-vars[main-color], true);
+    }
+
+    .rw-btn:hover {
+        .color-var(@theme-vars[main-variant-bg], true);
+    }
+}
 
 // **************
 // Layout
