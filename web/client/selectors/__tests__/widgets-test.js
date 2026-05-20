@@ -37,6 +37,7 @@ import {
     interactionTargetsFilterDisabledSelector,
     getApplyStyleOutOfSyncForFilterWidget,
     getApplyDimensionOutOfSyncForFilterWidget,
+    inactiveInteractionIdsForWidgetSelector,
     isTimelineEnabledForInteractions
 } from '../widgets';
 
@@ -770,6 +771,72 @@ describe('widgets selectors', () => {
                 editing: true
             }
         })).toBe(false);
+    });
+    describe('inactiveInteractionIdsForWidgetSelector', () => {
+        const getChartAxisInteractionState = ({ showCurrentTime, includeAxis = true } = {}) => ({
+            context: {
+                currentContext: {
+                    plugins: {
+                        desktop: []
+                    }
+                }
+            },
+            widgets: {
+                containers: {
+                    floating: {
+                        widgets: [{
+                            id: 'filter-widget',
+                            widgetType: 'filter',
+                            interactions: [{
+                                id: 'chart-axis-time-interaction',
+                                source: {
+                                    nodePath: 'widgets[filter-widget].filters[filter-1]'
+                                },
+                                target: {
+                                    nodePath: 'widgets[chart-widget].charts[chart-1].traces[trace-1].xAxisOpts[0].appliedCurrentTime',
+                                    metaData: {
+                                        dimension: 'time'
+                                    }
+                                },
+                                plugged: true,
+                                targetType: 'applyDimension'
+                            }]
+                        }, {
+                            id: 'chart-widget',
+                            widgetType: 'chart',
+                            charts: [{
+                                chartId: 'chart-1',
+                                traces: [{ id: 'trace-1', type: 'bar' }],
+                                ...(includeAxis ? {
+                                    xAxisOpts: [{ id: 0, type: 'date', showCurrentTime }]
+                                } : {})
+                            }]
+                        }]
+                    }
+                }
+            }
+        });
+
+        it('marks plugged chart axis time interactions inactive when show current time is disabled', () => {
+            expect(inactiveInteractionIdsForWidgetSelector(
+                getChartAxisInteractionState({ showCurrentTime: false }),
+                'filter-widget'
+            )).toEqual(['chart-axis-time-interaction']);
+        });
+
+        it('does not mark plugged chart axis time interactions inactive when show current time is enabled', () => {
+            expect(inactiveInteractionIdsForWidgetSelector(
+                getChartAxisInteractionState({ showCurrentTime: true }),
+                'filter-widget'
+            )).toEqual([]);
+        });
+
+        it('marks plugged chart axis time interactions inactive when default axis options are missing', () => {
+            expect(inactiveInteractionIdsForWidgetSelector(
+                getChartAxisInteractionState({ includeAxis: false }),
+                'filter-widget'
+            )).toEqual(['chart-axis-time-interaction']);
+        });
     });
     it('interactionTargetVisibilitySelector', () => {
 

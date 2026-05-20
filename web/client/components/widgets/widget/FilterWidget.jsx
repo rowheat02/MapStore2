@@ -51,12 +51,8 @@ const FilterWidget = ({
 
     // Handle selection change for a specific filter
     const handleSelectionChange = (filterId) => (newValues) => {
-        // Update widget state
-        const updatedSelections = {
-            ...selections,
-            [filterId]: newValues
-        };
-        updateProperty(id, 'selections', updatedSelections);
+        // Update only this filter selection to avoid stale full-object writes from slider events.
+        updateProperty(id, `selections[${filterId}]`, newValues);
 
         // Trigger interaction effects after state is updated
         // Use setTimeout to ensure reducer has processed UPDATE_PROPERTY first
