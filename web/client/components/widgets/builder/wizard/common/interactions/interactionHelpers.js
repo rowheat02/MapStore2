@@ -106,11 +106,13 @@ export const getInteractionTargetNodeDisabled = ({
         }
 
         const chartAxisCurrentTimeTarget = isChartAxisDimensionTarget(targetNodePath);
-        const chartAxisCurrentTimeEnabled = item?.interactionMetadata?.targets
+        const chartAxisDimensionTargetMetadata = item?.interactionMetadata?.targets
             ?.find(t => t?.targetType === TARGET_TYPES.APPLY_DIMENSION)
-            ?.showCurrentTimeEnabled === true;
+            || {};
+        const chartAxisCurrentTimeEnabled = chartAxisDimensionTargetMetadata?.showCurrentTimeEnabled === true;
+        const chartAxisDateType = chartAxisDimensionTargetMetadata?.dateType === true;
 
-        if (chartAxisCurrentTimeTarget && !chartAxisCurrentTimeEnabled) {
+        if (chartAxisCurrentTimeTarget && (!chartAxisCurrentTimeEnabled || !chartAxisDateType)) {
             return {
                 disabled: true,
                 reasonMsgId: 'widgets.filterWidget.axisCurrentTimeDisabledTooltip'

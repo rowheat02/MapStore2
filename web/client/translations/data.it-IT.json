@@ -2632,7 +2632,7 @@
         "applyDimensionMultipleSelectionDisabledTooltip": "«Applica dimensione» può essere collegato solo quando la modalità di selezione del filtro è «Singola». Imposta la modalità di selezione del layout su «Singola» per collegare questo target.",
         "layerTimeControlledByTimelineTooltip": "Il tempo del layer è controllato dalla Timeline della mappa principale. Collega invece il target Timeline.",
         "axisCurrentTimeControlledByTimelineTooltip": "Il tempo corrente dell’asse è controllato dalla Timeline della mappa principale. Collega invece il target Timeline.",
-        "axisCurrentTimeDisabledTooltip": "Abilita \"Mostra ora corrente\" per questo asse nelle opzioni del grafico prima di collegarlo.",
+        "axisCurrentTimeDisabledTooltip": "Imposta il tipo di asse su Data e abilita \"Mostra ora corrente\" nelle opzioni del grafico prima di collegarlo.",
         "timelineTargetUnavailableTooltip": "La Timeline non è disponibile in questo contesto.",
         "targetAlreadyConnectedToTimeTooltip": "La connessione alla timeline della mappa con la sincronizzazione a 2 vie abilitata può essere collegata solo da sola. Disabilita la sincronizzazione a 2 vie o scollega la connessione alla timeline della mappa per collegare altri obiettivi."
       },

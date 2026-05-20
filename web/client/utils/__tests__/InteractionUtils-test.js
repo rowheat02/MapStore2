@@ -154,9 +154,11 @@ describe('InteractionUtils', () => {
             expect(xAxisCurrentTimeNode.interactionMetadata.targets[0].targetType).toBe('applyDimension');
             expect(xAxisCurrentTimeNode.interactionMetadata.targets[0].dimension).toBe('time');
             expect(xAxisCurrentTimeNode.interactionMetadata.targets[0].showCurrentTimeEnabled).toBe(true);
+            expect(xAxisCurrentTimeNode.interactionMetadata.targets[0].dateType).toBe(true);
             expect(yAxisCollection.id).toBe('yAxisOpts[0]');
             expect(yAxisCurrentTimeNode.nodePath).toBe('widgets[chart-widget-single].charts[chart-1].traces[trace-2].yAxisOpts[0].appliedCurrentTime');
             expect(yAxisCurrentTimeNode.interactionMetadata.targets[0].showCurrentTimeEnabled).toBe(false);
+            expect(yAxisCurrentTimeNode.interactionMetadata.targets[0].dateType).toBe(true);
         });
 
         it('builds apply dimension target paths for default axis id 0', () => {
@@ -198,9 +200,11 @@ describe('InteractionUtils', () => {
             expect(traceCollection.children[0].id).toBe('xAxisOpts[0]');
             expect(traceCollection.children[0].children[0].nodePath).toBe('widgets[chart-widget-missing-axis-options].charts[chart-1].traces[trace-1].xAxisOpts[0].appliedCurrentTime');
             expect(traceCollection.children[0].children[0].interactionMetadata.targets[0].showCurrentTimeEnabled).toBe(false);
+            expect(traceCollection.children[0].children[0].interactionMetadata.targets[0].dateType).toBe(false);
             expect(traceCollection.children[1].id).toBe('yAxisOpts[0]');
             expect(traceCollection.children[1].children[0].nodePath).toBe('widgets[chart-widget-missing-axis-options].charts[chart-1].traces[trace-1].yAxisOpts[0].appliedCurrentTime');
             expect(traceCollection.children[1].children[0].interactionMetadata.targets[0].showCurrentTimeEnabled).toBe(false);
+            expect(traceCollection.children[1].children[0].interactionMetadata.targets[0].dateType).toBe(false);
         });
 
         it('does not add axis target nodes for pie traces', () => {

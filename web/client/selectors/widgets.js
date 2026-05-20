@@ -9,7 +9,7 @@
 import { find, get, castArray, flatten } from 'lodash';
 import { mapSelector } from './map';
 import { getEffectivelyVisibleLayers, getSelectedLayer, layersSelector } from './layers';
-import { generateRootTree, TARGET_TYPES, getChartAxisFromCurrentTimeTargetPath, isAnyLayerPath, isChartAxisDimensionTarget, isLayerDimensionTarget, isLayerTimeDimensionTarget, isMapTimeTarget } from '../utils/InteractionUtils';
+import { generateRootTree, TARGET_TYPES, getChartAxisFromCurrentTimeTargetPath, isAnyLayerPath, isChartAxisDateType, isChartAxisDimensionTarget, isLayerDimensionTarget, isLayerTimeDimensionTarget, isMapTimeTarget } from '../utils/InteractionUtils';
 import { currentTimeSelector } from './dimension';
 import { pathnameSelector } from './router';
 import { DEFAULT_TARGET, DEPENDENCY_SELECTOR_KEY, LAYERS_REGEX, WIDGETS_REGEX } from '../actions/widgets';
@@ -105,7 +105,7 @@ const shouldSkipInteractionForChartAxisAvailability = (interaction, state) => {
         return false;
     }
     const axis = getChartAxisFromCurrentTimeTargetPath(targetPath, getFloatingWidgetsPerView(state) || []);
-    return axis?.showCurrentTime !== true;
+    return axis?.showCurrentTime !== true || !isChartAxisDateType(axis);
 };
 
 export const shouldSkipInteraction = (interaction, state) => {

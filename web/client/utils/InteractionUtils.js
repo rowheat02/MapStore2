@@ -183,6 +183,10 @@ function normalizeValueAttributeType(valueAttributeType) {
     return (valueAttributeType || '').toLowerCase();
 }
 
+export function isChartAxisDateType(axis) {
+    return normalizeValueAttributeType(axis?.type) === 'date';
+}
+
 function getAllowedDimensionNames(valueAttributeType) {
     const normalizedType = normalizeValueAttributeType(valueAttributeType);
     const allowedDimensions = new Set();
@@ -261,7 +265,7 @@ function createDimensionTargetMetadata(layer, dimension) {
     };
 }
 
-function createChartAxisDimensionTargetMetadata({ chartId, traceId, showCurrentTimeEnabled }) {
+function createChartAxisDimensionTargetMetadata({ chartId, traceId, showCurrentTimeEnabled, dateType }) {
     return {
         targetType: TARGET_TYPES.APPLY_DIMENSION,
         expectedDataType: DATATYPES.LAYER_DIMENSION,
@@ -269,7 +273,8 @@ function createChartAxisDimensionTargetMetadata({ chartId, traceId, showCurrentT
         dimension: 'time',
         chartId,
         traceId,
-        showCurrentTimeEnabled
+        showCurrentTimeEnabled,
+        dateType
     };
 }
 
@@ -460,7 +465,8 @@ function createChartAxisCurrentTimeNode(axis, axisKey, chartId, traceId) {
             targets: [createChartAxisDimensionTargetMetadata({
                 chartId,
                 traceId,
-                showCurrentTimeEnabled: axis?.showCurrentTime === true
+                showCurrentTimeEnabled: axis?.showCurrentTime === true,
+                dateType: isChartAxisDateType(axis)
             })]
         }
     };

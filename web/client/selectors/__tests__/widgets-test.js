@@ -773,7 +773,7 @@ describe('widgets selectors', () => {
         })).toBe(false);
     });
     describe('inactiveInteractionIdsForWidgetSelector', () => {
-        const getChartAxisInteractionState = ({ showCurrentTime, includeAxis = true } = {}) => ({
+        const getChartAxisInteractionState = ({ showCurrentTime, axisType = 'date', includeAxis = true } = {}) => ({
             context: {
                 currentContext: {
                     plugins: {
@@ -808,7 +808,7 @@ describe('widgets selectors', () => {
                                 chartId: 'chart-1',
                                 traces: [{ id: 'trace-1', type: 'bar' }],
                                 ...(includeAxis ? {
-                                    xAxisOpts: [{ id: 0, type: 'date', showCurrentTime }]
+                                    xAxisOpts: [{ id: 0, type: axisType, showCurrentTime }]
                                 } : {})
                             }]
                         }]
@@ -829,6 +829,13 @@ describe('widgets selectors', () => {
                 getChartAxisInteractionState({ showCurrentTime: true }),
                 'filter-widget'
             )).toEqual([]);
+        });
+
+        it('marks plugged chart axis time interactions inactive when axis is not date type', () => {
+            expect(inactiveInteractionIdsForWidgetSelector(
+                getChartAxisInteractionState({ showCurrentTime: true, axisType: 'linear' }),
+                'filter-widget'
+            )).toEqual(['chart-axis-time-interaction']);
         });
 
         it('marks plugged chart axis time interactions inactive when default axis options are missing', () => {
