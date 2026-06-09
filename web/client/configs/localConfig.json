@@ -70,7 +70,45 @@
   "userSessions": {
     "enabled": true
   },
-  "projectionDefs": [],
+  "gridFiles": {
+    "PENR2009": {
+      "path": "https://mapas-gis-inter.carm.es/imagenes/mapstore/grids/PENR2009.gsb",
+      "type": "gsb",
+      "description": "Rejilla para cambio de Datum entre ED50 y ETRS89 (en formato NTV2)"
+    }
+  },
+  "projectionDefs": [
+    {
+      "code": "EPSG:4258",
+      "def": "+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs +type=crs",
+      "extent": [-180, -90, 180, 90],
+      "worldExtent": [-180, -90, 180, 90]
+    },
+    {
+      "code": "EPSG:4230",
+      "def": "+proj=longlat +ellps=intl +nadgrids=PENR2009 +no_defs +type=crs",
+      "extent": [-180, -90, 180, 90],
+      "worldExtent": [-180, -90, 180, 90]
+    },
+    {
+      "code": "EPSG:25830",
+      "def": "+proj=utm +zone=30 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs +nadgrids=PENR2009",
+      "extent": [227071.8572857892, 3901876.695336829, 772928.1427142108, 8942165.537905218],
+      "worldExtent": [-6.0, 35.2228, -0.0014, 80.4020]
+    },
+    {
+      "code": "EPSG:23030",
+      "def": "+proj=utm +zone=30 +ellps=intl  +units=m +no_defs +type=crs +nadgrids=PENR2009",
+      "extent": [-99844.71, 3860322.09, 3721117.79, 8254681.75],
+      "worldExtent": [-9.56, 34.88, 31.59, 71.24]
+    },
+    {
+      "code": "EPSG:32630",
+      "def": "+proj=utm +zone=30 +datum=WGS84 +units=m +no_defs +type=crs",
+      "extent": [166021.4431, 0.0, 833978.5569, 9329005.1825],
+      "worldExtent": [-6.0, 0.0, 0.0, 84.0]
+    }
+  ],
   "initialState": {
     "defaultState": {
       "catalog": {
@@ -573,10 +611,15 @@
       {
         "name": "CRSSelector",
         "cfg": {
-          "allowedRoles": ["ADMIN"],
+          "allowedRoles": ["ADMIN", "USER"],
           "availableProjections": [
-            { "value": "EPSG:4326", "label": "EPSG:4326" },
-            { "value": "EPSG:3857", "label": "EPSG:3857" }
+            { "value": "EPSG:4326", "label": "WGS84" },
+            { "value": "EPSG:32630", "label": "WGS84 / UTM30N" },
+            { "value": "EPSG:3857", "label": "WEB MERCATOR" },
+            { "value": "EPSG:25830", "label": "ETRS89 / UTM30N" },
+            { "value": "EPSG:4258", "label": "ETRS89" },
+            { "value": "EPSG:4230", "label": "ED50" },
+            { "value": "EPSG:23030", "label": "ED50/UTM30N" }
           ]
         }
       },
